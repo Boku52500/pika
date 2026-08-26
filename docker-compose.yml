@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pika-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pika
+      POSTGRES_PASSWORD: pika
+      POSTGRES_DB: pika
+    ports:
+      - "5432:5432"
+    volumes:
+      - pika_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pika -d pika"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pika_pgdata:

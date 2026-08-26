@@ -1,0 +1,113 @@
+import { getDeliveryFee } from "@/lib/cart";
+
+/**
+ * Static checkout reference data + pure helpers. Kept separate from
+ * `lib/cart.ts` (generic cart math) and from the checkout form hook (UI
+ * state) so a future backend can replace any one of the three without
+ * touching the others.
+ */
+
+export interface CustomerInfo {
+  firstName: string;
+  lastName: string;
+  /** Local part only, e.g. "555 12 34 56" — the "+995" prefix is a fixed UI element, not part of the stored value. */
+  phone: string;
+  email: string;
+}
+
+export interface DeliveryAddress {
+  /** One of `georgianCities`' values. */
+  city: string;
+  address: string;
+  /** კორპუსი / სახლის ნომერი — optional. */
+  building: string;
+  /** ბინა — optional. */
+  apartment: string;
+  /** სადარბაზო — optional. */
+  entrance: string;
+  /** სართული — optional. */
+  floor: string;
+  /** დამატებითი ინფორმაცია — optional. */
+  notes: string;
+}
+
+/** The subset of checkout state that validation and order creation actually need — excludes purely UI-only bits like `touched`/`submitted`. */
+export interface CheckoutData {
+  customer: CustomerInfo;
+  delivery: DeliveryAddress;
+  deliveryMethod: DeliveryMethodId | null;
+  paymentMethod: PaymentMethodId | null;
+}
+
+export interface CityOption {
+  value: string;
+  label: string;
+}
+
+/** Structured so real delivery-zone logic (pricing/coverage per city) can replace this flat list later. */
+export const georgianCities: CityOption[] = [
+  { value: "tbilisi", label: "თბილისი" },
+  { value: "batumi", label: "ბათუმი" },
+  { value: "kutaisi", label: "ქუთაისი" },
+  { value: "rustavi", label: "რუსთავი" },
+  { value: "gori", label: "გორი" },
+  { value: "zugdidi", label: "ზუგდიდი" },
+  { value: "other", label: "სხვა" },
+];
+
+export function getCityLabel(cityValue: string): string {
+  return georgianCities.find((city) => city.value === cityValue)?.label ?? cityValue;
+}
+
+export type DeliveryMethodId = "standard" | "express";
+
+export interface DeliveryMethodOption {
+  id: DeliveryMethodId;
+  label: string;
+  estimate: string;
+  /** Flat mock fee — no courier API yet. */
+  price: number;
+}
+
+export const deliveryMethods: DeliveryMethodOption[] = [
+  { id: "standard", label: "სტანდარტული მიწოდება", estimate: "1–3 სამუშაო დღე", price: 5 },
+  { id: "express", label: "სწრაფი მიწოდება", estimate: "იმავე დღეს ან მომდევნო სამუშაო დღეს", price: 15 },
+];
+
+/**
+ * Standard delivery still benefits from the cart's free-shipping threshold;
+ * express is a premium service and always keeps its flat fee. Reuses
+ * `getDeliveryFee` from `lib/cart.ts` instead of re-deriving the
+ * free-shipping rule, per the "one source of truth" requirement.
+ */
+export function getDeliveryMethodFee(method: DeliveryMethodOption, payableSubtotal: number): number {
+  if (method.id === "standard") return getDeliveryFee(payableSubtotal);
+  return method.price;
+}
+
+export type PaymentMethodId = "card" | "installment" | "cash-on-delivery";
+
+export interface PaymentMethodOption {
+  id: PaymentMethodId;
+  label: string;
+  description: string;
+}
+
+export const paymentMethods: PaymentMethodOption[] = [
+  { id: "card", label: "საბანკო ბარათი", description: "უსაფრთხო გადახდა ონლაინ" },
+  { id: "installment", label: "განვადება", description: "გადაანაწილეთ თანხა თვეებში ბანკის მეშვეობით" },
+  { id: "cash-on-delivery", label: "კურიერთან გადახდა", description: "გადაიხადეთ მიღებისას — ნაღდი ან ბარათით" },
+];
+
+export interface InstallmentProvider {
+  id: string;
+  name: string;
+  months: number[];
+}
+
+/** UI-only placeholder list — structured so real Georgian bank integrations can be dropped in without redesigning the installment panel. */
+export const installmentProviders: InstallmentProvider[] = [
+  { id: "tbc", name: "თიბისი ბანკი", months: [3, 6, 9, 12] },
+  { id: "bog", name: "საქართველოს ბანკი", months: [3, 6, 10, 12] },
+  { id: "credo", name: "კრედო ბანკი", months: [3, 6, 12] },
+];
