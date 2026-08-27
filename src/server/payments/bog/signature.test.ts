@@ -41,6 +41,7 @@ describe("callback payload matching", () => {
     };
     const parsed = bogCallbackEnvelopeSchema.safeParse({
       event: "order_payment",
+      zoned_request_time: "2022-11-23T18:06:37.240559Z",
       body: details,
     });
     assert.equal(parsed.success, true);
@@ -75,7 +76,11 @@ describe("callback payload matching", () => {
   });
 
   it("rejects a malformed callback envelope", () => {
-    const parsed = bogCallbackEnvelopeSchema.safeParse({ event: "order_payment", body: {} });
+    const parsed = bogCallbackEnvelopeSchema.safeParse({
+      event: "order_payment",
+      zoned_request_time: "2022-11-23T18:06:37.240559Z",
+      body: {},
+    });
     assert.equal(parsed.success, false);
   });
 });

@@ -1,4 +1,4 @@
-import { bogCallbackEnvelopeSchema } from "@/server/payments/bog/schemas";
+import { bogCallbackEnvelopeSchema, bogZodIssues, canonicalizeBogPaymentDetails } from "@/server/payments/bog/schemas";
 import { getBogCallbackPublicKeyPem } from "@/server/payments/bog/publicKey";
 import { verifyBogCallbackSignature } from "@/server/payments/bog/signature";
 import { logError, logInfo, logWarn } from "@/server/log";
@@ -25,25 +25,30 @@ export async function POST(request: Request) {
 
   const parsed = bogCallbackEnvelopeSchema.safeParse(parsedJson);
   if (!parsed.success) {
-    logWarn("bog.callback_received", { reason: "invalid_payload" });
+    logWarn("bog.callback_received", {
+      reason: "invalid_payload",
+      validationIssues: bogZodIssues(parsed.error),
+    });
     return Response.json({ ok: false }, { status: 400 });
   }
 
+  const details = canonicalizeBogPaymentDetails(parsed.data.body);
+
   logInfo("bog.callback_received", {
     event: parsed.data.event,
-    providerOrderId: parsed.data.body.order_id,
-    externalOrderId: parsed.data.body.external_order_id,
-    providerStatus: parsed.data.body.order_status.key,
+    providerOrderId: details.order_id,
+    externalOrderId: details.external_order_id,
+    providerStatus: details.order_status.key,
   });
 
   try {
-    const result = await reconcileBogPaymentDetails(parsed.data.body);
+    const result = await reconcileBogPaymentDetails(details);
     if (!result) {
       return Response.json({ ok: true, matched: false }, { status: 200 });
     }
     return Response.json({ ok: true }, { status: 200 });
   } catch (error) {
-    logError("bog.callback_received", { error, providerOrderId: parsed.data.body.order_id });
+    logError("bog.callback_received", { error, providerOrderId: details.order_id });
     return Response.json({ ok: false }, { status: 500 });
   }
 }

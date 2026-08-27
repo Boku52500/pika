@@ -9,6 +9,8 @@ import type { BogCreateOrderBody } from "@/server/payments/bog/payload";
 import {
   bogCreateOrderResponseSchema,
   bogPaymentDetailsSchema,
+  bogZodIssues,
+  canonicalizeBogPaymentDetails,
   type BogCreateOrderResponse,
   type BogPaymentDetails,
 } from "@/server/payments/bog/schemas";
@@ -62,8 +64,12 @@ export async function getBogPaymentDetails(providerOrderId: string): Promise<Bog
 
   const parsed = bogPaymentDetailsSchema.safeParse(raw);
   if (!parsed.success) {
-    logError("bog.payment_details_failed", { reason: "invalid_details_response", providerOrderId });
+    logError("bog.payment_details_failed", {
+      reason: "invalid_details_response",
+      providerOrderId,
+      validationIssues: bogZodIssues(parsed.error),
+    });
     throw new BogApiError("BOG payment-details response was invalid", 200);
   }
-  return parsed.data;
+  return canonicalizeBogPaymentDetails(parsed.data);
 }
