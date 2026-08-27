@@ -1,6 +1,6 @@
 # Production deployment
 
-Pika is a Next.js App Router shop with PostgreSQL, Auth.js credentials, and optional Cloudflare R2 images. Payments, courier APIs, and OAuth are not part of this deployment.
+Pika is a Next.js App Router shop with PostgreSQL, Auth.js credentials, optional Cloudflare R2 images, and optional Bank of Georgia card payments. Courier APIs and OAuth are not part of this deployment.
 
 Do not run `prisma migrate dev` or `npm run db:seed` against production.
 
@@ -36,6 +36,7 @@ Optional:
 - R2 variables — see `docs/storage.md`. Set `R2_PUBLIC_URL` to `https://images.pika.ge` once DNS exists.
 - `IMAGE_REMOTE_HOSTS` — extra `next/image` hostnames
 - `RATE_LIMIT_STORE` — `postgres` (production default) or `memory` (single process)
+- Bank of Georgia card payments — see `docs/payments-bog.md`. Set `BOG_CLIENT_ID` / `BOG_CLIENT_SECRET` (and optional `BOG_PAYMENTS_ENABLED`) on the host. Callback URL is `${APP_ORIGIN}/api/payments/bog/callback` and must be public HTTPS.
 
 ## Database
 

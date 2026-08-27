@@ -6,6 +6,7 @@ import { formatPrice, formatGeorgianDate } from "@/lib/utils";
 import type { StorefrontOrder } from "@/lib/orderView";
 import { AccountEmptyState } from "./AccountEmptyState";
 import { OrderStatusBadge } from "./OrderStatusBadge";
+import { PaymentStatusBadge } from "@/components/payments/PaymentStatusBadge";
 
 export function OrdersPageClient({ orders }: { orders: StorefrontOrder[] }) {
   return (
@@ -45,6 +46,7 @@ export function OrdersPageClient({ orders }: { orders: StorefrontOrder[] }) {
 
                   <div className="flex flex-wrap items-center gap-3">
                     <OrderStatusBadge status={order.status} />
+                    <PaymentStatusBadge status={order.paymentStatus} />
                     <span className="tnum text-small font-semibold text-text">{formatPrice(order.total)}</span>
                     <span className="text-small font-medium text-brand-600">დეტალების ნახვა</span>
                   </div>

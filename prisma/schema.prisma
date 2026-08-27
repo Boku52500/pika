@@ -38,9 +38,24 @@ enum OrderStatus {
 enum PaymentStatus {
   unpaid
   pending
+  processing
   paid
   failed
   refunded
+  partially_refunded
+}
+
+enum PaymentProvider {
+  bog
+}
+
+enum PaymentAttemptStatus {
+  pending
+  processing
+  paid
+  failed
+  refunded
+  partially_refunded
 }
 
 enum DeliveryMethod {
@@ -578,7 +593,8 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items OrderItem[]
+  items    OrderItem[]
+  payments Payment[]
 
   @@index([customerId, createdAt])
   @@index([orderStatus])
@@ -605,6 +621,37 @@ model OrderItem {
 
   @@index([orderId])
   @@index([productId])
+}
+
+/// One provider payment attempt for a Pika Order. Card charges live here, not on Order.
+model Payment {
+  id                   String                @id @default(cuid())
+  orderId              String
+  provider             PaymentProvider       @default(bog)
+  providerOrderId      String?
+  idempotencyKey       String                @unique
+  status               PaymentAttemptStatus  @default(pending)
+  amount               Decimal               @db.Decimal(12, 2)
+  currency             String                @default("GEL")
+  method               String?
+  transactionId        String?
+  authCode             String?
+  responseCode         String?
+  responseDescription  String?
+  providerStatus       String?
+  redirectUrl          String?
+  rejectReason         String?
+  lastError            String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  completedAt          DateTime?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerOrderId])
+  @@index([orderId, createdAt])
+  @@index([providerOrderId])
+  @@index([status])
 }
 
 model WishlistItem {

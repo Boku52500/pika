@@ -16,9 +16,11 @@ export const ORDER_STATUS_LABEL = {
 export const PAYMENT_STATUS_LABEL = {
   unpaid: "გადაუხდელი",
   pending: "მოლოდინში",
+  processing: "მუშავდება",
   paid: "გადახდილი",
   failed: "წარუმატებელი",
   refunded: "დაბრუნებული",
+  partially_refunded: "ნაწილობრივ დაბრუნებული",
 } as const;
 
 export const PAYMENT_METHOD_LABEL = {

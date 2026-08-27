@@ -13,6 +13,8 @@ import {
 import { adminCardClass } from "@/components/admin/adminUi";
 import { ProductImage } from "@/components/product/ProductImage";
 import { OrderStatusForm } from "@/components/admin/OrderStatusForm";
+import { PaymentRefreshForm } from "@/components/admin/PaymentRefreshForm";
+import { PAYMENT_STATUS_COPY } from "@/lib/paymentCopy";
 import type { ProductVisual } from "@/types/product";
 
 export const metadata: Metadata = { title: "შეკვეთა" };
@@ -63,8 +65,86 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         <h2 className="mb-3 text-base font-semibold text-text">სტატუსის მართვა</h2>
         <OrderStatusForm orderId={order.id} current={order.orderStatus} />
         <p className="text-label mt-3 text-text-faint">
-          გადახდის სტატუსი ცალკე რჩება: {PAYMENT_STATUS_LABEL[order.paymentStatus]}. „მიწოდებული“ არ ნიშნავს „გადახდილს“.
+          შეკვეთის სტატუსი ცალკე რჩება გადახდისგან. BOG ბარათის სტატუსს ადმინი ხელით PAID-ზე ვერ გადაიყვანს —
+          გამოიყენეთ გადახდის სტატუსის განახლება.
         </p>
+      </section>
+
+      <section className={adminCardClass}>
+        <h2 className="mb-3 text-base font-semibold text-text">გადახდები</h2>
+        <p className="text-small mb-3 text-text-muted">
+          {PAYMENT_METHOD_LABEL[order.paymentMethod]} · {PAYMENT_STATUS_LABEL[order.paymentStatus]}
+        </p>
+        {order.payments.length === 0 ? (
+          <p className="text-small text-text-muted">ამ შეკვეთაზე პროვაიდერის გადახდის მცდელობა არ არის.</p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {order.payments.map((payment) => (
+              <li key={payment.id} className="rounded-[var(--radius-sm)] border border-border p-3 text-small">
+                <p className="font-semibold text-text">
+                  {payment.provider === "bog" ? "საქართველოს ბანკი" : payment.provider} ·{" "}
+                  {PAYMENT_STATUS_COPY[payment.status]?.label ?? payment.status}
+                </p>
+                <dl className="mt-2 grid gap-1 text-text-muted">
+                  {payment.providerOrderId ? (
+                    <div>
+                      <dt className="text-label text-text-faint">BOG order id</dt>
+                      <dd className="tnum break-all">{payment.providerOrderId}</dd>
+                    </div>
+                  ) : null}
+                  {payment.providerStatus ? (
+                    <div>
+                      <dt className="text-label text-text-faint">პროვაიდერის სტატუსი</dt>
+                      <dd>{payment.providerStatus}</dd>
+                    </div>
+                  ) : null}
+                  {payment.method ? (
+                    <div>
+                      <dt className="text-label text-text-faint">მეთოდი</dt>
+                      <dd>{payment.method}</dd>
+                    </div>
+                  ) : null}
+                  {payment.transactionId ? (
+                    <div>
+                      <dt className="text-label text-text-faint">Transaction ID</dt>
+                      <dd className="tnum break-all">{payment.transactionId}</dd>
+                    </div>
+                  ) : null}
+                  {payment.authCode ? (
+                    <div>
+                      <dt className="text-label text-text-faint">Auth code</dt>
+                      <dd className="tnum">{payment.authCode}</dd>
+                    </div>
+                  ) : null}
+                  {payment.responseCode ? (
+                    <div>
+                      <dt className="text-label text-text-faint">Response</dt>
+                      <dd>
+                        {payment.responseCode}
+                        {payment.responseDescription ? ` — ${payment.responseDescription}` : ""}
+                      </dd>
+                    </div>
+                  ) : null}
+                  <div>
+                    <dt className="text-label text-text-faint">შექმნა</dt>
+                    <dd>{formatGeorgianDate(new Date(payment.createdAt).getTime())}</dd>
+                  </div>
+                  {payment.completedAt ? (
+                    <div>
+                      <dt className="text-label text-text-faint">დასრულება</dt>
+                      <dd>{formatGeorgianDate(new Date(payment.completedAt).getTime())}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </li>
+            ))}
+          </ul>
+        )}
+        {order.payments.some((payment) => payment.provider === "bog" && payment.providerOrderId) ? (
+          <div className="mt-4">
+            <PaymentRefreshForm orderId={order.id} />
+          </div>
+        ) : null}
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">

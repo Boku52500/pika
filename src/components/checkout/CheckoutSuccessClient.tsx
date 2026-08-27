@@ -9,6 +9,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatPrice } from "@/lib/utils";
 import type { StorefrontOrder } from "@/lib/orderView";
 import { deliveryMethods, paymentMethods, getCityLabel } from "@/lib/checkout";
+import { paymentCopyFor } from "@/lib/paymentCopy";
+import { PaymentStatusBadge } from "@/components/payments/PaymentStatusBadge";
 import { featuredCategories } from "@/data/categories";
 
 /**
@@ -42,12 +44,13 @@ export function CheckoutSuccessClient({ order }: { order: StorefrontOrder | null
         </span>
         <h1 className="text-h2 text-text">შეკვეთა წარმატებით გაფორმდა</h1>
         <p className="text-body max-w-md text-text-muted">
-          მადლობთ შენაძენისთვის! შეკვეთა მიღებულია. გადახდა ჯერ არ დამუშავებულა.
+          {paymentCopyFor(order.paymentStatus).body}
         </p>
         <p className="text-small tnum text-text-faint">
           შეკვეთის ნომერი — <span className="font-semibold text-text">{order.id}</span>
         </p>
         <OrderStatusBadge status={order.status} />
+        <PaymentStatusBadge status={order.paymentStatus} />
       </div>
 
       <div className="mx-auto mt-10 grid max-w-2xl gap-4 sm:grid-cols-2">
@@ -63,11 +66,7 @@ export function CheckoutSuccessClient({ order }: { order: StorefrontOrder | null
         <div className="rounded-[var(--radius-md)] border border-border bg-surface p-5">
           <p className="text-label mb-1 text-text-faint">გადახდის მეთოდი</p>
           <p className="text-body font-semibold text-text">{paymentMethod?.label}</p>
-          {order.paymentMethod === "card" || order.paymentMethod === "installment" ? (
-            <p className="text-small mt-1 text-text-muted">გადახდა ჯერ არ დამუშავებულა — რეალური გადახდა არ განხორციელებულა.</p>
-          ) : (
-            <p className="text-small mt-1 text-text-muted">გადახდა კურიერთან მიღებისას. შეკვეთა ჯერ გადაუხდელია.</p>
-          )}
+          <p className="text-small mt-1 text-text-muted">{paymentCopyFor(order.paymentStatus).label}</p>
           {order.paymentMethod === "installment" && order.installmentMonths ? (
             <p className="text-small mt-1 text-text-muted">{order.installmentMonths} თვიანი განვადება</p>
           ) : null}

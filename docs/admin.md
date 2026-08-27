@@ -27,6 +27,6 @@ Existing customers stay `CUSTOMER` by default. Demotion is a database update of 
 
 ## What it manages
 
-Products (including **Cloudflare R2 image uploads**, generic variants, specification groups), categories, brands, orders (status only — payment status stays independent), and promotions.
+Products (including **Cloudflare R2 image uploads**, generic variants, specification groups), categories, brands, orders (fulfillment status plus BOG payment attempts — payment status is provider-controlled; see `docs/payments-bog.md`), and promotions.
 
 Product binaries live in R2. PostgreSQL stores `url` + optional `objectKey`. See `docs/storage.md`.

@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { getCartTotal } from "@/lib/cart";
+import type { PaymentMethodId } from "@/lib/checkout";
 import type { ResolvedCartLine } from "@/hooks/useCart";
 import { usePromoCode } from "@/hooks/usePromoCode";
 import { CartLineCard } from "@/components/cart/CartLineCard";
@@ -21,6 +22,7 @@ export function CheckoutOrderSummary({
   deliveryFee,
   submitting = false,
   error,
+  paymentMethod,
   className,
 }: {
   items: ResolvedCartLine[];
@@ -28,6 +30,7 @@ export function CheckoutOrderSummary({
   deliveryFee: number;
   submitting?: boolean;
   error?: string | null;
+  paymentMethod?: PaymentMethodId | null;
   className?: string;
 }) {
   const { result } = usePromoCode(subtotal);
@@ -61,7 +64,9 @@ export function CheckoutOrderSummary({
       </Button>
 
       <p className="text-label text-center normal-case tracking-normal text-text-faint">
-        ღილაკზე დაჭერით იქმნება შეკვეთა. რეალური გადახდა ჯერ არ ხორციელდება.
+        {paymentMethod === "card"
+          ? "შეკვეთის დადასტურების შემდეგ გადახვალთ საქართველოს ბანკის უსაფრთხო გადახდის გვერდზე."
+          : "ღილაკზე დაჭერით იქმნება შეკვეთა. ბარათის მონაცემები ამ გვერდზე არ გროვდება."}
       </p>
     </div>
   );

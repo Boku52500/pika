@@ -37,6 +37,11 @@ export function collectEnvIssues(mode: "development" | "production"): EnvIssue[]
         issues.push({ key: "APP_ORIGIN", message: "invalid URL" });
       }
     }
+
+    if (bogPaymentsRequested()) {
+      if (!process.env.BOG_CLIENT_ID?.trim()) issues.push({ key: "BOG_CLIENT_ID", message: "missing" });
+      if (!process.env.BOG_CLIENT_SECRET?.trim()) issues.push({ key: "BOG_CLIENT_SECRET", message: "missing" });
+    }
   }
 
   return issues;
@@ -50,4 +55,14 @@ export function r2Configured(): boolean {
       process.env.R2_BUCKET_NAME?.trim() &&
       process.env.R2_PUBLIC_URL?.trim(),
   );
+}
+
+export function bogCredentialsPresent(): boolean {
+  return Boolean(process.env.BOG_CLIENT_ID?.trim() && process.env.BOG_CLIENT_SECRET?.trim());
+}
+
+export function bogPaymentsRequested(): boolean {
+  const raw = process.env.BOG_PAYMENTS_ENABLED?.trim().toLowerCase();
+  if (raw === "true" || raw === "1" || raw === "on") return true;
+  return bogCredentialsPresent();
 }

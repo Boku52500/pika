@@ -106,6 +106,7 @@ SEO title/description live on translations. `indexable` and `canonicalOverride` 
 | Specs | `SpecificationGroup` → `SpecificationDefinition` → `ProductSpecification`; `CategorySpecification` assigns specs to categories |
 | Customers | `Customer` (`CustomerRole` `CUSTOMER` \| `ADMIN`, bcrypt `passwordHash`, optional `emailVerified`), `PasswordResetToken` (hashed), `Address` (Georgian fields, scoped to customer) |
 | Orders | `Order` + `OrderItem` (price/name/SKU/variant snapshots). `customerId` is optional for guests (`ON DELETE SET NULL`) |
+| Payments | `Payment` attempts (`PaymentProvider` `bog` today). Card charges live on `Payment`, not as a replacement for `Order.orderNumber`. See `docs/payments-bog.md`. |
 | Social | `WishlistItem` (unique customer+product), `Review` (moderation status) |
 | Promotions | `Promotion` (percentage/fixed, dates, min order, usage limits) — applied server-side at checkout |
 

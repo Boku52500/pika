@@ -24,8 +24,9 @@ import { CheckoutStickyMobileBar } from "./CheckoutStickyMobileBar";
 
 /**
  * Orchestrates `/checkout`: live cart + promo, form state, and a server
- * order-creation action. The browser cart is cleared only after PostgreSQL
- * confirms the order. Guest checkout stays available.
+ * order-creation action. Cash/installment orders clear the browser cart after
+ * PostgreSQL confirms the order. Card checkout redirects to Bank of Georgia
+ * and clears the cart only after payment is confirmed.
  */
 export function CheckoutPageClient() {
   const router = useRouter();
@@ -117,6 +118,16 @@ export function CheckoutPageClient() {
 
     if (!result.ok) {
       setSubmitError(result.message);
+      if (result.orderNumber) {
+        setOrderPlaced(true);
+        router.push(`/checkout/payment/fail?order=${encodeURIComponent(result.orderNumber)}`);
+      }
+      return;
+    }
+
+    if (result.data.redirectUrl) {
+      setOrderPlaced(true);
+      window.location.assign(result.data.redirectUrl);
       return;
     }
 
@@ -183,6 +194,7 @@ export function CheckoutPageClient() {
             deliveryFee={deliveryFee}
             submitting={submitting}
             error={submitError}
+            paymentMethod={form.state.paymentMethod}
             className="lg:sticky lg:top-24"
           />
         </div>

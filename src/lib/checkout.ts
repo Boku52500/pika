@@ -94,7 +94,7 @@ export interface PaymentMethodOption {
 }
 
 export const paymentMethods: PaymentMethodOption[] = [
-  { id: "card", label: "საბანკო ბარათი", description: "უსაფრთხო გადახდა ონლაინ" },
+  { id: "card", label: "საბანკო ბარათი", description: "გადახდა საქართველოს ბანკის უსაფრთხო გადახდის გვერდზე" },
   { id: "installment", label: "განვადება", description: "გადაანაწილეთ თანხა თვეებში ბანკის მეშვეობით" },
   { id: "cash-on-delivery", label: "კურიერთან გადახდა", description: "გადაიხადეთ მიღებისას — ნაღდი ან ბარათით" },
 ];

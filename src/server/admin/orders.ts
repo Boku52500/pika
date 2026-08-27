@@ -149,7 +149,11 @@ function parseSnapshot(value: unknown): ItemSnapshot {
 export async function getAdminOrder(id: string) {
   const order = await prisma.order.findFirst({
     where: { OR: [{ id }, { orderNumber: id }] },
-    include: { items: true, customer: { select: { id: true, email: true } } },
+    include: {
+      items: true,
+      customer: { select: { id: true, email: true } },
+      payments: { orderBy: { createdAt: "desc" } },
+    },
   });
   if (!order) return null;
 
@@ -181,6 +185,24 @@ export async function getAdminOrder(id: string) {
     total: moneyToNumber(order.total),
     promoCode: order.promoCode,
     installmentMonths: order.installmentMonths,
+    payments: order.payments.map((payment) => ({
+      id: payment.id,
+      provider: payment.provider,
+      providerOrderId: payment.providerOrderId,
+      status: payment.status,
+      providerStatus: payment.providerStatus,
+      method: payment.method,
+      amount: moneyToNumber(payment.amount),
+      currency: payment.currency,
+      transactionId: payment.transactionId,
+      authCode: payment.authCode,
+      responseCode: payment.responseCode,
+      responseDescription: payment.responseDescription,
+      rejectReason: payment.rejectReason,
+      lastError: payment.lastError,
+      createdAt: payment.createdAt.toISOString(),
+      completedAt: payment.completedAt?.toISOString() ?? null,
+    })),
     items: order.items.map((item) => {
       const snapshot = parseSnapshot(item.selectedVariants);
       const axes = Array.isArray(snapshot.axes) ? snapshot.axes : [];

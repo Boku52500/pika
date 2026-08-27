@@ -5,7 +5,7 @@
 import "dotenv/config";
 
 import { pingDatabase } from "../src/server/prisma";
-import { collectEnvIssues, r2Configured } from "../src/server/config/validateEnv";
+import { collectEnvIssues, r2Configured, bogCredentialsPresent } from "../src/server/config/validateEnv";
 import { getAppOriginString } from "../src/lib/appUrl";
 import { prisma } from "../src/server/prisma";
 
@@ -25,6 +25,7 @@ async function main() {
   console.log("  Environment variables present");
   console.log(`  App origin: ${getAppOriginString()}`);
   console.log(`  R2 configured: ${r2Configured() ? "yes" : "no (admin upload disabled)"}`);
+  console.log(`  BOG card payments: ${bogCredentialsPresent() ? "credentials present" : "not configured"}`);
 
   await pingDatabase();
   console.log("  PostgreSQL reachable");

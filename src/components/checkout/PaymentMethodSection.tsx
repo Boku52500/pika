@@ -88,8 +88,8 @@ export function PaymentMethodSection({
         <div className="flex items-start gap-2.5 rounded-[var(--radius-md)] border border-border bg-surface-2 p-4">
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand-600" strokeWidth={1.75} />
           <p className="text-small text-text-muted">
-            შეკვეთის დადასტურების შემდეგ გადახდის უსაფრთხო გვერდზე გადახვალთ — ბარათის მონაცემები ამ საიტზე არ ინახება
-            და არ გროვდება.
+            შეკვეთის დადასტურების შემდეგ გადახვალთ საქართველოს ბანკის უსაფრთხო გადახდის გვერდზე — ბარათის
+            მონაცემები ამ საიტზე არ ინახება და არ გროვდება.
           </p>
         </div>
       ) : null}

@@ -349,7 +349,23 @@ async function main() {
   `;
   assert(imageObjectKey[0], "ProductImage.objectKey column is missing");
 
-  console.log("  Auth/order constraints: unique email, wishlist pair, order number, password reset tokens, order FK SET NULL, Customer.role, ProductImage.objectKey");
+  const paymentTable = await prisma.$queryRaw<{ table_name: string }[]>`
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'Payment'
+  `;
+  assert(paymentTable[0], "Payment table is missing");
+
+  const paymentStatusValues = await prisma.$queryRaw<{ value: string }[]>`
+    SELECT unnest(enum_range(NULL::"PaymentStatus"))::text AS value
+  `;
+  const paymentStatusSet = new Set(paymentStatusValues.map((row) => row.value));
+  assert(paymentStatusSet.has("processing") && paymentStatusSet.has("partially_refunded"), "PaymentStatus must include processing and partially_refunded");
+
+  const paymentCount = await prisma.payment.count();
+  assert(paymentCount >= 0, "Payment count query failed");
+
+  console.log("  Auth/order constraints: unique email, wishlist pair, order number, password reset tokens, order FK SET NULL, Customer.role, ProductImage.objectKey, Payment attempts");
   console.log("Database verify passed.");
 }
 

@@ -14,6 +14,8 @@ import { DEFAULT_LOCALE } from "@/server/locale";
 import { ORDER_CONFIRM_COOKIE } from "@/server/account/orders";
 import { asProductVisual, asTone } from "@/lib/orderView";
 import { randomBytes } from "node:crypto";
+import { bogConfigured, BOG_NOT_CONFIGURED_MESSAGE } from "@/server/payments/bog/config";
+import { createPendingCardPayment, PaymentUserError, startBogPaymentForOrder } from "@/server/payments/initiate";
 
 class OrderUserError extends Error {
   constructor(message: string) {
@@ -54,7 +56,9 @@ function variantMatches(
   );
 }
 
-export async function createOrder(input: unknown): Promise<ActionResult<{ orderNumber: string }>> {
+export async function createOrder(
+  input: unknown,
+): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string }>> {
   const parsed = orderSubmissionSchema.safeParse(input);
   if (!parsed.success) {
     const { message, fieldErrors } = firstZodMessage(parsed.error);
@@ -67,10 +71,18 @@ export async function createOrder(input: unknown): Promise<ActionResult<{ orderN
   if (!(await consumeRateLimit(`checkout:ip:${ip}`, 20, 15 * 60 * 1000))) {
     return { ok: false, message: "ძალიან ბევრი მცდელობაა. სცადეთ მოგვიანებით." };
   }
+  if (payload.paymentMethod === "card") {
+    if (!(await consumeRateLimit(`payment:ip:${ip}`, 10, 15 * 60 * 1000))) {
+      return { ok: false, message: "ძალიან ბევრი მცდელობაა. სცადეთ მოგვიანებით." };
+    }
+    if (!bogConfigured()) {
+      return { ok: false, message: BOG_NOT_CONFIGURED_MESSAGE };
+    }
+  }
   const promoCode = payload.promoCode?.trim().toUpperCase() || null;
 
   try {
-    const orderNumber = await prisma.$transaction(async (tx) => {
+    const placed = await prisma.$transaction(async (tx) => {
       const productIds = [...new Set(payload.items.map((item) => item.productId))];
       const products = await tx.product.findMany({
         where: { id: { in: productIds }, isActive: true },
@@ -249,7 +261,7 @@ export async function createOrder(input: unknown): Promise<ActionResult<{ orderN
           additionalInfo: payload.address.additionalInfo,
           deliveryMethod: payload.deliveryMethod,
           paymentMethod: payload.paymentMethod,
-          paymentStatus: "unpaid",
+          paymentStatus: payload.paymentMethod === "card" ? "pending" : "unpaid",
           orderStatus: "pending",
           subtotal: numberToMoney(subtotal),
           discount: numberToMoney(discount),
@@ -271,11 +283,15 @@ export async function createOrder(input: unknown): Promise<ActionResult<{ orderN
         },
       });
 
-      return order.orderNumber;
+      if (payload.paymentMethod === "card") {
+        await createPendingCardPayment(tx, { id: order.id, total: order.total });
+      }
+
+      return { orderNumber: order.orderNumber, orderId: order.id, paymentMethod: payload.paymentMethod };
     });
 
     const jar = await cookies();
-    jar.set(ORDER_CONFIRM_COOKIE, orderNumber, {
+    jar.set(ORDER_CONFIRM_COOKIE, placed.orderNumber, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
@@ -283,7 +299,20 @@ export async function createOrder(input: unknown): Promise<ActionResult<{ orderN
       maxAge: 60 * 60,
     });
 
-    return { ok: true, data: { orderNumber } };
+    if (placed.paymentMethod === "card") {
+      try {
+        const { redirectUrl } = await startBogPaymentForOrder(placed.orderId);
+        return { ok: true, data: { orderNumber: placed.orderNumber, redirectUrl } };
+      } catch (error) {
+        if (error instanceof PaymentUserError) {
+          return { ok: false, message: error.message, orderNumber: placed.orderNumber };
+        }
+        logError("order.payment_start_failed", { error, orderNumber: placed.orderNumber });
+        return { ok: false, message: GENERIC_SERVER_ERROR, orderNumber: placed.orderNumber };
+      }
+    }
+
+    return { ok: true, data: { orderNumber: placed.orderNumber } };
   } catch (error) {
     if (error instanceof OrderUserError) {
       return { ok: false, message: error.message };

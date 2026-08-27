@@ -8,8 +8,17 @@ import { formatAddressLines } from "@/lib/addressFormat";
 import type { StorefrontOrder } from "@/lib/orderView";
 import { OrderStatusBadge } from "./OrderStatusBadge";
 import { OrderItemsList } from "./OrderItemsList";
+import { PaymentStatusBadge } from "@/components/payments/PaymentStatusBadge";
+import { RetryPaymentButton } from "@/components/payments/RetryPaymentButton";
+import { paymentCopyFor } from "@/lib/paymentCopy";
 
-export function OrderDetailPageClient({ order }: { order: StorefrontOrder | null }) {
+export function OrderDetailPageClient({
+  order,
+  canRetryPayment = false,
+}: {
+  order: StorefrontOrder | null;
+  canRetryPayment?: boolean;
+}) {
   if (!order) {
     return (
       <div className="flex flex-col items-start gap-4 py-10">
@@ -81,7 +90,15 @@ export function OrderDetailPageClient({ order }: { order: StorefrontOrder | null
         {order.paymentMethod === "installment" && order.installmentMonths ? (
           <p className="text-label mt-1 text-text-muted">{order.installmentMonths} თვიანი განვადება</p>
         ) : null}
-        <p className="text-label mt-1 text-text-faint">გადახდა ჯერ არ დამუშავებულა. შეკვეთა გადაუხდელია.</p>
+        <p className="text-label mt-1 text-text-faint">{paymentCopyFor(order.paymentStatus).label}</p>
+        <div className="mt-3">
+          <PaymentStatusBadge status={order.paymentStatus} />
+        </div>
+        {canRetryPayment ? (
+          <div className="mt-4">
+            <RetryPaymentButton orderNumber={order.id} />
+          </div>
+        ) : null}
       </section>
     </div>
   );

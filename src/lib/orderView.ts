@@ -20,7 +20,7 @@ export type StorefrontOrder = {
   createdAt: number;
   customerId: string | null;
   status: OrderStatus;
-  paymentStatus: "unpaid" | "pending" | "paid" | "failed" | "refunded";
+  paymentStatus: "unpaid" | "pending" | "processing" | "paid" | "failed" | "refunded" | "partially_refunded";
   items: StorefrontOrderItem[];
   subtotal: number;
   discount: number;

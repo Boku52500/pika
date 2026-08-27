@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { OrderDetailPageClient } from "@/components/account/OrderDetailPageClient";
 import { requireCustomer } from "@/server/auth/session";
-import { getCustomerOrder } from "@/server/account/orders";
+import { getPaymentPageData } from "@/server/payments/load";
 
 export const metadata: Metadata = {
   title: "შეკვეთის დეტალები — Pika",
@@ -11,6 +11,6 @@ export const metadata: Metadata = {
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const customer = await requireCustomer("/account/orders");
-  const order = await getCustomerOrder(customer.id, decodeURIComponent(id));
-  return <OrderDetailPageClient order={order} />;
+  const data = await getPaymentPageData(decodeURIComponent(id), customer.id, { reconcile: true });
+  return <OrderDetailPageClient order={data?.order ?? null} canRetryPayment={data?.canRetry ?? false} />;
 }

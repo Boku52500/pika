@@ -1,5 +1,10 @@
 export type ActionOk<T = undefined> = T extends undefined ? { ok: true } : { ok: true; data: T };
-export type ActionFail = { ok: false; message: string; fieldErrors?: Record<string, string> };
+export type ActionFail = {
+  ok: false;
+  message: string;
+  fieldErrors?: Record<string, string>;
+  orderNumber?: string;
+};
 export type ActionResult<T = undefined> = ActionOk<T> | ActionFail;
 
 export const AUTH_REQUIRED = "საჭიროა ავტორიზაცია";

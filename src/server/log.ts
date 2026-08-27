@@ -1,6 +1,6 @@
 import "server-only";
 
-const REDACT_KEYS = /password|secret|token|authorization|cookie|hash|database_url|access_key/i;
+const REDACT_KEYS = /password|secret|token|authorization|cookie|hash|database_url|access_key|signature|payer|pan|card_number|client_secret/i;
 
 function sanitize(value: unknown, key = ""): unknown {
   if (REDACT_KEYS.test(key)) return "[redacted]";
