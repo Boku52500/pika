@@ -17,6 +17,7 @@
     "prod:verify": "tsx --tsconfig tsconfig.json scripts/prod-verify.ts",
     "admin:promote": "tsx --tsconfig tsconfig.json scripts/admin-promote.ts",
     "test:payments": "tsx --tsconfig tsconfig.json --test src/server/payments/bog/status.test.ts src/server/payments/bog/payload.test.ts src/server/payments/bog/signature.test.ts src/server/payments/bog/schemas.test.ts src/server/payments/bog/refundRequest.test.ts src/server/payments/refundable.test.ts src/server/payments/refundReconcile.test.ts",
+    "test:email": "tsx --tsconfig tsconfig.json --test src/server/email/events.test.ts src/server/email/templates.test.ts src/server/email/config.test.ts src/server/email/providerResult.test.ts src/lib/appUrl.email.test.ts",
     "db:studio": "prisma studio",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down"
@@ -34,6 +35,7 @@
     "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "resend": "^6.24.0",
     "server-only": "^0.0.1",
     "sharp": "^0.35.3",
     "tailwind-merge": "^3.6.0",

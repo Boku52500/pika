@@ -18,6 +18,10 @@ export function getAppOriginString(): string {
   return getAppOrigin().origin;
 }
 
+export function passwordResetUrl(rawToken: string): string {
+  return `${getAppOriginString()}/reset-password?token=${encodeURIComponent(rawToken)}`;
+}
+
 export function isLocalHostname(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 }

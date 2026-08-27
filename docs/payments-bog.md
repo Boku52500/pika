@@ -68,6 +68,8 @@ Paid attempts are not overwritten by a later `rejected`. Order fulfillment statu
 
 `reconcileBogPaymentDetails` is shared by the callback, the customer return pages, and admin **გადახდის სტატუსის განახლება**. It checks provider order id, Pika order number, currency, and amounts (tetri). Admins cannot toggle a BOG payment to paid or refunded by hand.
 
+The first transition into `paid` / `partially_refunded` / `refunded` also schedules the matching customer email. Duplicate callbacks do not resend. See `docs/email.md`.
+
 ## Admin refunds
 
 Admins can request a full or partial card refund from `/admin/orders/[id]` (**თანხის დაბრუნება**). The action calls `requireAdminAction()`, creates a `PaymentRefund` row with a UUID v4 `Idempotency-Key`, then `POST /payments/v1/payment/refund/:order_id`.

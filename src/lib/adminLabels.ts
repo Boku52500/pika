@@ -36,6 +36,21 @@ export const PAYMENT_REFUND_STATUS_LABEL = {
   failed: "ვერ შესრულდა",
 } as const;
 
+export const EMAIL_EVENT_LABEL = {
+  password_reset: "პაროლის აღდგენა",
+  order_confirmation: "შეკვეთის დადასტურება",
+  payment_paid: "გადახდის დადასტურება",
+  refund_partial: "ნაწილობრივი დაბრუნება",
+  refund_full: "სრული დაბრუნება",
+  order_status: "შეკვეთის სტატუსი",
+} as const;
+
+export const EMAIL_DELIVERY_STATUS_LABEL = {
+  pending: "მოლოდინში",
+  sent: "გაიგზავნა",
+  failed: "ვერ გაიგზავნა",
+} as const;
+
 export const DELIVERY_METHOD_LABEL = {
   standard: "სტანდარტული მიწოდება",
   express: "სწრაფი მიწოდება",

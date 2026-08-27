@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Container } from "@/components/ui/Container";
 import { Logo } from "@/components/layout/Logo";
 
-/** Shared centered-card layout for /login, /register, /forgot-password. */
+/** Shared centered-card layout for /login, /register, /forgot-password, /reset-password. */
 export function AuthLayout({
   title,
   subtitle,

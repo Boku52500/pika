@@ -15,6 +15,7 @@ import { ProductImage } from "@/components/product/ProductImage";
 import { OrderStatusForm } from "@/components/admin/OrderStatusForm";
 import { PaymentRefreshForm } from "@/components/admin/PaymentRefreshForm";
 import { PaymentRefundForm } from "@/components/admin/PaymentRefundForm";
+import { AdminEmailHistory } from "@/components/admin/AdminEmailHistory";
 import { PAYMENT_STATUS_COPY } from "@/lib/paymentCopy";
 import { PAYMENT_REFUND_STATUS_LABEL } from "@/lib/adminLabels";
 import type { ProductVisual } from "@/types/product";
@@ -263,6 +264,8 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
           </dl>
         </section>
       </div>
+
+      <AdminEmailHistory emails={order.emails} />
 
       <section className={adminCardClass}>
         <h2 className="mb-3 text-base font-semibold text-text">პროდუქტები (snapshot)</h2>

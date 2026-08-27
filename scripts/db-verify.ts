@@ -382,7 +382,35 @@ async function main() {
     "PaymentRefundStatus must include requested, processing, completed, failed",
   );
 
-  console.log("  Auth/order constraints: unique email, wishlist pair, order number, password reset tokens, order FK SET NULL, Customer.role, ProductImage.objectKey, Payment attempts, PaymentRefund");
+  const emailTable = await prisma.$queryRaw<{ exists: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'EmailDelivery'
+    ) AS exists
+  `;
+  assert(emailTable[0]?.exists, "EmailDelivery table is missing");
+
+  const emailEventValues = await prisma.$queryRaw<{ value: string }[]>`
+    SELECT unnest(enum_range(NULL::"EmailEventType"))::text AS value
+  `;
+  const emailEventSet = new Set(emailEventValues.map((row) => row.value));
+  assert(
+    emailEventSet.has("password_reset") &&
+      emailEventSet.has("order_confirmation") &&
+      emailEventSet.has("payment_paid") &&
+      emailEventSet.has("refund_partial") &&
+      emailEventSet.has("refund_full") &&
+      emailEventSet.has("order_status"),
+    "EmailEventType must include password_reset, order_confirmation, payment_paid, refund_partial, refund_full, order_status",
+  );
+
+  const emailKeyIndex = await prisma.$queryRaw<{ indexname: string }[]>`
+    SELECT indexname FROM pg_indexes
+    WHERE schemaname = 'public' AND indexname = 'EmailDelivery_eventKey_key'
+  `;
+  assert(emailKeyIndex[0], "Unique index on EmailDelivery.eventKey is missing");
+
+  console.log("  Auth/order constraints: unique email, wishlist pair, order number, password reset tokens, order FK SET NULL, Customer.role, ProductImage.objectKey, Payment attempts, PaymentRefund, EmailDelivery");
   console.log("Database verify passed.");
 }
 

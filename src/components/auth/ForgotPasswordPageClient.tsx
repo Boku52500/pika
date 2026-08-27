@@ -9,11 +9,6 @@ import { AuthLayout } from "./AuthLayout";
 import { validateForgotPassword } from "@/lib/authValidation";
 import { requestPasswordReset } from "@/server/actions/auth";
 
-/**
- * Password recovery is backend-ready (hashed token stored when the email
- * exists) but email delivery is not configured. The confirmation copy is
- * honest and does not claim a message was sent.
- */
 export function ForgotPasswordPageClient() {
   const [email, setEmail] = useState("");
   const [touched, setTouched] = useState(false);
@@ -39,10 +34,9 @@ export function ForgotPasswordPageClient() {
             <Info className="size-7 text-brand-700" strokeWidth={1.5} />
           </span>
           <div>
-            <p className="text-body font-semibold text-text">ელ. ფოსტის მიწოდება ჯერ არ არის ჩართული</p>
+            <p className="text-body font-semibold text-text">თუ ეს ელ. ფოსტა რეგისტრირებულია, გამოგიგზავნით აღდგენის ბმულს.</p>
             <p className="text-small mt-1.5 text-text-muted">
-              აღდგენის წერილი არ გაიგზავნა. თუ ანგარიში არსებობს, მოთხოვნა სისტემაში დარეგისტრირდა — ბმულის
-              გამოგზავნა მოგვიანებით ჩაირთვება.
+              იგივე პასუხს ვაბრუნებთ ყოველთვის, რომ ანგარიშის არსებობა არ გამოჩნდეს.
             </p>
           </div>
           <Button href="/login" variant="secondary" className="mt-1">
@@ -56,7 +50,7 @@ export function ForgotPasswordPageClient() {
   return (
     <AuthLayout
       title="პაროლის აღდგენა"
-      subtitle="შეიყვანეთ ელ. ფოსტა. წერილის გამოგზავნა ჯერ არ არის ჩართული."
+      subtitle="შეიყვანეთ ელ. ფოსტა. თუ ეს ელ. ფოსტა რეგისტრირებულია, გამოგიგზავნით აღდგენის ბმულს."
       footer={
         <p className="text-small text-text-muted">
           გაგახსენდათ პაროლი?{" "}
@@ -83,7 +77,7 @@ export function ForgotPasswordPageClient() {
         </FormField>
 
         <Button type="submit" size="lg" className="w-full">
-          მოთხოვნის გაგზავნა
+          ბმულის მოთხოვნა
         </Button>
       </form>
     </AuthLayout>

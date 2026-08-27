@@ -16,6 +16,8 @@ import { asProductVisual, asTone } from "@/lib/orderView";
 import { randomBytes } from "node:crypto";
 import { bogConfigured, BOG_NOT_CONFIGURED_MESSAGE } from "@/server/payments/bog/config";
 import { createPendingCardPayment, PaymentUserError, startBogPaymentForOrder } from "@/server/payments/initiate";
+import { scheduleEmail } from "@/server/email/schedule";
+import { notifyOrderConfirmation } from "@/server/email/notify";
 
 class OrderUserError extends Error {
   constructor(message: string) {
@@ -298,6 +300,8 @@ export async function createOrder(
       path: "/",
       maxAge: 60 * 60,
     });
+
+    scheduleEmail(() => notifyOrderConfirmation(placed.orderId));
 
     if (placed.paymentMethod === "card") {
       try {

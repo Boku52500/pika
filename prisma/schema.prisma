@@ -65,6 +65,21 @@ enum PaymentRefundStatus {
   failed
 }
 
+enum EmailEventType {
+  password_reset
+  order_confirmation
+  payment_paid
+  refund_partial
+  refund_full
+  order_status
+}
+
+enum EmailDeliveryStatus {
+  pending
+  sent
+  failed
+}
+
 enum DeliveryMethod {
   standard
   express
@@ -514,6 +529,7 @@ model Customer {
   reviews             Review[]
   passwordResetTokens PasswordResetToken[]
   paymentRefunds      PaymentRefund[]
+  emailDeliveries     EmailDelivery[]
 
   @@index([email])
   @@index([phone])
@@ -601,8 +617,9 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items    OrderItem[]
-  payments Payment[]
+  items           OrderItem[]
+  payments        Payment[]
+  emailDeliveries EmailDelivery[]
 
   @@index([customerId, createdAt])
   @@index([orderStatus])
@@ -656,8 +673,9 @@ model Payment {
   updatedAt            DateTime              @updatedAt
   completedAt          DateTime?
 
-  order   Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  refunds PaymentRefund[]
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  refunds         PaymentRefund[]
+  emailDeliveries EmailDelivery[]
 
   @@unique([provider, providerOrderId])
   @@index([orderId, createdAt])
@@ -683,13 +701,45 @@ model PaymentRefund {
   updatedAt          DateTime            @updatedAt
   completedAt        DateTime?
 
-  payment          Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  requestedByAdmin Customer? @relation(fields: [requestedByAdminId], references: [id], onDelete: SetNull)
+  payment          Payment          @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  requestedByAdmin Customer?        @relation(fields: [requestedByAdminId], references: [id], onDelete: SetNull)
+  emailDeliveries  EmailDelivery[]
 
   @@unique([provider, providerActionId])
   @@index([paymentId, createdAt])
   @@index([status])
   @@index([requestedByAdminId])
+}
+
+/// One logical transactional email (idempotent by eventKey). Bodies are not stored.
+model EmailDelivery {
+  id                String              @id @default(cuid())
+  eventKey          String              @unique
+  type              EmailEventType
+  status            EmailDeliveryStatus @default(pending)
+  recipient         String
+  recipientDomain   String?
+  subject           String
+  orderId           String?
+  paymentId         String?
+  refundId          String?
+  customerId        String?
+  providerMessageId String?
+  attempts          Int                 @default(0)
+  lastError         String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  sentAt            DateTime?
+
+  order    Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  payment  Payment?       @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  refund   PaymentRefund? @relation(fields: [refundId], references: [id], onDelete: SetNull)
+  customer Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+  @@index([status])
+  @@index([type])
+  @@index([customerId])
 }
 
 model WishlistItem {

@@ -161,6 +161,7 @@ export async function getAdminOrder(id: string) {
         orderBy: { createdAt: "desc" },
         include: { refunds: { orderBy: { createdAt: "desc" } } },
       },
+      emailDeliveries: { orderBy: { createdAt: "desc" }, take: 20 },
     },
   });
   if (!order) return null;
@@ -193,6 +194,17 @@ export async function getAdminOrder(id: string) {
     total: moneyToNumber(order.total),
     promoCode: order.promoCode,
     installmentMonths: order.installmentMonths,
+    emails: order.emailDeliveries.map((row) => ({
+      id: row.id,
+      type: row.type,
+      status: row.status,
+      recipient: row.recipient,
+      subject: row.subject,
+      providerMessageId: row.providerMessageId,
+      lastError: row.lastError,
+      createdAt: row.createdAt.toISOString(),
+      sentAt: row.sentAt?.toISOString() ?? null,
+    })),
     payments: order.payments.map((payment) => {
       const refunds = payment.refunds.map((refund) => ({
         id: refund.id,

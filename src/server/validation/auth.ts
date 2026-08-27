@@ -47,6 +47,17 @@ export const forgotPasswordInputSchema = z.object({
   email: z.string().trim().toLowerCase().min(1, "შეიყვანეთ ელ. ფოსტა"),
 });
 
+export const resetPasswordInputSchema = z
+  .object({
+    token: z.string().trim().min(16, "ბმული არასწორია ან ვადაგასულია."),
+    password: passwordSchema,
+    confirmPassword: z.string().min(1, "გაიმეორეთ პაროლი"),
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    message: "პაროლები არ ემთხვევა",
+    path: ["confirmPassword"],
+  });
+
 export type LoginInput = z.infer<typeof loginInputSchema>;
 export type RegisterInput = z.infer<typeof registerInputSchema>;
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;

@@ -37,6 +37,7 @@ Optional:
 - `IMAGE_REMOTE_HOSTS` — extra `next/image` hostnames
 - `RATE_LIMIT_STORE` — `postgres` (production default) or `memory` (single process)
 - Bank of Georgia card payments — see `docs/payments-bog.md`. Set `BOG_CLIENT_ID` / `BOG_CLIENT_SECRET` (and optional `BOG_PAYMENTS_ENABLED`) on the host. Callback URL is `${APP_ORIGIN}/api/payments/bog/callback` and must be public HTTPS.
+- Transactional email (Resend) — see `docs/email.md`. Set `RESEND_API_KEY` and `EMAIL_FROM` (`Pika <noreply@pika.ge>`). The shop still boots if they are missing locally; production verify requires them.
 
 ## Database
 
@@ -90,7 +91,7 @@ Health: `GET /api/health` returns `{ ok: true, db: "up" }` or `503` `{ ok: false
 
 Promote an admin only from a trusted shell: `npm run admin:promote -- you@example.com`.
 
-Password reset stores a hashed token and does **not** send email until delivery is configured.
+Password reset sends mail through Resend when configured. The public request still returns one generic success message and does not reveal whether the email exists. See `docs/email.md`.
 
 ## Domain and HTTPS
 

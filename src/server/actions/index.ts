@@ -1,6 +1,6 @@
 import "server-only";
 
-export { registerCustomer, requestPasswordReset } from "@/server/actions/auth";
+export { registerCustomer, requestPasswordReset, completePasswordReset } from "@/server/actions/auth";
 export { updateCustomerProfile, changeCustomerPassword } from "@/server/actions/profile";
 export {
   listMyAddresses,

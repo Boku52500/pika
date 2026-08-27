@@ -11,6 +11,9 @@ import {
   shouldApplyAttemptStatus,
 } from "@/server/payments/bog/status";
 import { planRefundRowUpdates, providerRefundAmountFromDetails } from "@/server/payments/refundReconcile";
+import { scheduleEmail } from "@/server/email/schedule";
+import { notifyPaymentPaid, notifyRefund } from "@/server/email/notify";
+import { planPaymentEmails } from "@/server/email/events";
 
 export type ReconcileResult = {
   paymentId: string;
@@ -82,6 +85,7 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
     };
   }
 
+  const previousStatus = payment.status;
   const incomingStatus = mapBogStatusToAttempt(details.order_status.key);
   const applyStatus = shouldApplyAttemptStatus(payment.status, incomingStatus);
   const nextStatus = applyStatus ? incomingStatus : payment.status;
@@ -162,6 +166,15 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
         ?.filter((action) => action.action === "refund" || action.action === "partial_refund")
         .map((action) => action.action_id),
     });
+  }
+
+  const plan = planPaymentEmails(previousStatus, nextStatus);
+  if (plan === "payment_paid") {
+    scheduleEmail(() => notifyPaymentPaid(payment.id));
+  } else if (plan === "refund_partial") {
+    scheduleEmail(() => notifyRefund(payment.id, "partial"));
+  } else if (plan === "refund_full") {
+    scheduleEmail(() => notifyRefund(payment.id, "full"));
   }
 
   return {

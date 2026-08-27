@@ -107,6 +107,7 @@ SEO title/description live on translations. `indexable` and `canonicalOverride` 
 | Customers | `Customer` (`CustomerRole` `CUSTOMER` \| `ADMIN`, bcrypt `passwordHash`, optional `emailVerified`), `PasswordResetToken` (hashed), `Address` (Georgian fields, scoped to customer) |
 | Orders | `Order` + `OrderItem` (price/name/SKU/variant snapshots). `customerId` is optional for guests (`ON DELETE SET NULL`) |
 | Payments | `Payment` attempts (`PaymentProvider` `bog` today) and `PaymentRefund` rows for admin-initiated BOG card refunds. Card charges live on `Payment`, not as a replacement for `Order.orderNumber`. See `docs/payments-bog.md`. |
+| Email | `EmailDelivery` — one row per logical transactional event (`eventKey` unique). Bodies are not stored. See `docs/email.md`. |
 | Social | `WishlistItem` (unique customer+product), `Review` (moderation status) |
 | Promotions | `Promotion` (percentage/fixed, dates, min order, usage limits) — applied server-side at checkout |
 
@@ -148,7 +149,7 @@ Catalog functions return JSON-safe DTOs from `src/server/catalog/mappers.ts` (GE
 
 Validation for mutations: `src/server/validation` (Zod). Server actions in `src/server/actions` create customers, update profiles/passwords/addresses/wishlists, and create orders. Order submission **does not accept client prices** — live PostgreSQL product data is revalidated in a transaction.
 
-Authentication is Auth.js v5 (Credentials + JWT cookies). Account routes are protected by `src/proxy.ts` and `requireCustomer()` on the server. Admin routes (`/admin/*`) are protected by the same proxy (login redirect) plus `requireAdmin()` / `requireAdminAction()`, which re-read `Customer.role` from PostgreSQL on every page and mutation. Email/password only; OAuth is not wired. Password reset stores a hashed token but does **not** send email until delivery is configured.
+Authentication is Auth.js v5 (Credentials + JWT cookies). Account routes are protected by `src/proxy.ts` and `requireCustomer()` on the server. Admin routes (`/admin/*`) are protected by the same proxy (login redirect) plus `requireAdmin()` / `requireAdminAction()`, which re-read `Customer.role` from PostgreSQL on every page and mutation. Email/password only; OAuth is not wired. Password reset emails go through Resend (`docs/email.md`). The public request always returns the same success so accounts cannot be enumerated.
 
 Promote an existing customer (never a public admin signup):
 

@@ -42,6 +42,14 @@ export function collectEnvIssues(mode: "development" | "production"): EnvIssue[]
       if (!process.env.BOG_CLIENT_ID?.trim()) issues.push({ key: "BOG_CLIENT_ID", message: "missing" });
       if (!process.env.BOG_CLIENT_SECRET?.trim()) issues.push({ key: "BOG_CLIENT_SECRET", message: "missing" });
     }
+
+    if (!process.env.RESEND_API_KEY?.trim()) issues.push({ key: "RESEND_API_KEY", message: "missing" });
+    if (!process.env.EMAIL_FROM?.trim()) issues.push({ key: "EMAIL_FROM", message: "missing" });
+  } else {
+    const resendKey = process.env.RESEND_API_KEY?.trim() ?? "";
+    const emailFrom = process.env.EMAIL_FROM?.trim() ?? "";
+    if (resendKey && !emailFrom) issues.push({ key: "EMAIL_FROM", message: "required when RESEND_API_KEY is set" });
+    if (emailFrom && !resendKey) issues.push({ key: "RESEND_API_KEY", message: "required when EMAIL_FROM is set" });
   }
 
   return issues;

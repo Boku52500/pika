@@ -20,6 +20,9 @@ import { parseMoneyInput } from "@/server/money";
 import { stockStateFromQuantity } from "@/server/admin/stock";
 import { categoryWouldCycle } from "@/server/admin/categories";
 import { revalidateCatalogue, revalidateOrders, revalidatePromotions } from "@/server/admin/revalidate";
+import { scheduleEmail } from "@/server/email/schedule";
+import { notifyOrderStatus } from "@/server/email/notify";
+import { shouldSendOrderStatusEmail } from "@/server/email/events";
 import { PRODUCT_IMAGE_MAX_BYTES } from "@/lib/productImageLimits";
 import {
   STORAGE_NOT_CONFIGURED,
@@ -634,15 +637,22 @@ export async function updateAdminOrderStatus(input: unknown): Promise<ActionResu
 
   const order = await prisma.order.findUnique({
     where: { id: parsed.data.orderId },
-    select: { id: true, paymentStatus: true },
+    select: { id: true, orderStatus: true },
   });
   if (!order) return { ok: false, message: "შეკვეთა ვერ მოიძებნა" };
+
+  if (order.orderStatus === parsed.data.orderStatus) {
+    return { ok: true };
+  }
 
   await prisma.order.update({
     where: { id: order.id },
     data: { orderStatus: parsed.data.orderStatus },
   });
   revalidateOrders();
+  if (shouldSendOrderStatusEmail(order.orderStatus, parsed.data.orderStatus)) {
+    scheduleEmail(() => notifyOrderStatus(order.id, parsed.data.orderStatus));
+  }
   return { ok: true };
 }
 
