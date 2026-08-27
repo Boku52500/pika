@@ -10,6 +10,7 @@ import {
   mapBogStatusToAttempt,
   shouldApplyAttemptStatus,
 } from "@/server/payments/bog/status";
+import { planRefundRowUpdates, providerRefundAmountFromDetails } from "@/server/payments/refundReconcile";
 
 export type ReconcileResult = {
   paymentId: string;
@@ -26,7 +27,10 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
   const payment =
     (await prisma.payment.findFirst({
       where: { provider: "bog", providerOrderId: details.order_id },
-      include: { order: { select: { id: true, orderNumber: true, paymentStatus: true } } },
+      include: {
+        order: { select: { id: true, orderNumber: true, paymentStatus: true } },
+        refunds: { orderBy: { createdAt: "asc" } },
+      },
       orderBy: { createdAt: "desc" },
     })) ??
     (details.external_order_id
@@ -36,7 +40,10 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
             status: { in: ["pending", "processing"] },
             order: { orderNumber: details.external_order_id },
           },
-          include: { order: { select: { id: true, orderNumber: true, paymentStatus: true } } },
+          include: {
+            order: { select: { id: true, orderNumber: true, paymentStatus: true } },
+            refunds: { orderBy: { createdAt: "asc" } },
+          },
           orderBy: { createdAt: "desc" },
         })
       : null);
@@ -79,6 +86,13 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
   const applyStatus = shouldApplyAttemptStatus(payment.status, incomingStatus);
   const nextStatus = applyStatus ? incomingStatus : payment.status;
   const terminal = nextStatus === "paid" || nextStatus === "failed" || nextStatus === "refunded" || nextStatus === "partially_refunded";
+  const providerRefundAmount = providerRefundAmountFromDetails(details.purchase_units?.refund_amount);
+  const refundUpdates = planRefundRowUpdates({
+    refunds: payment.refunds,
+    providerStatus: details.order_status.key,
+    providerRefundAmount,
+    actions: details.actions,
+  });
 
   await prisma.$transaction(async (tx) => {
     await tx.payment.update({
@@ -87,6 +101,7 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
         status: nextStatus,
         providerStatus: details.order_status.key,
         providerOrderId: payment.providerOrderId ?? details.order_id,
+        providerRefundAmount: providerRefundAmount ?? undefined,
         method: details.payment_detail?.transfer_method?.key ?? payment.method,
         transactionId: details.payment_detail?.transaction_id ?? undefined,
         authCode: details.payment_detail?.auth_code ?? undefined,
@@ -96,6 +111,17 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
         completedAt: terminal ? (payment.completedAt ?? new Date()) : undefined,
       },
     });
+
+    for (const update of refundUpdates) {
+      await tx.paymentRefund.update({
+        where: { id: update.id },
+        data: {
+          status: update.status,
+          providerStatus: update.providerStatus,
+          completedAt: update.completedAt ?? undefined,
+        },
+      });
+    }
 
     const attempts = await tx.payment.findMany({
       where: { orderId: payment.orderId },
@@ -124,6 +150,19 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
     status: nextStatus,
     applied: applyStatus,
   });
+
+  if (refundUpdates.length > 0) {
+    logInfo("bog.refund_reconciled", {
+      paymentId: payment.id,
+      orderNumber: payment.order.orderNumber,
+      providerOrderId: details.order_id,
+      providerStatus: details.order_status.key,
+      refundIds: refundUpdates.map((row) => row.id),
+      actionIds: details.actions
+        ?.filter((action) => action.action === "refund" || action.action === "partial_refund")
+        .map((action) => action.action_id),
+    });
+  }
 
   return {
     paymentId: payment.id,

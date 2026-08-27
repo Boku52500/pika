@@ -36,3 +36,5 @@ export function bogConfigured(): boolean {
 
 export const BOG_NOT_CONFIGURED_MESSAGE =
   "ბარათით გადახდა ამჟამად მიუწვდომელია. აირჩიეთ სხვა მეთოდი ან სცადეთ მოგვიანებით.";
+
+export const BOG_REFUND_NOT_CONFIGURED_MESSAGE = "თანხის დაბრუნება ამჟამად მიუწვდომელია.";

@@ -2,9 +2,9 @@
 
 Pika keeps merchant orders (`PIKA-…`) separate from BOG payment attempts. A Pika `Order` is created first; each card checkout or retry creates a `Payment` row and then a BOG ecommerce order. Redirect pages are UX only. Authoritative status comes from the signed callback and/or `GET /payments/v1/receipt/:order_id`.
 
-Official docs: [Introduction](https://api.bog.ge/docs/en/payments/introduction), [Authentication](https://api.bog.ge/docs/en/payments/authentication), [Create order](https://api.bog.ge/docs/en/payments/standard-process/create-order), [Payment details](https://api.bog.ge/docs/en/payments/standard-process/get-payment-details), [Callback](https://api.bog.ge/docs/en/payments/standard-process/callback), [Response codes](https://api.bog.ge/docs/en/payments/response-codes).
+Official docs: [Introduction](https://api.bog.ge/docs/en/payments/introduction), [Authentication](https://api.bog.ge/docs/en/payments/authentication), [Create order](https://api.bog.ge/docs/en/payments/standard-process/create-order), [Payment details](https://api.bog.ge/docs/en/payments/standard-process/get-payment-details), [Callback](https://api.bog.ge/docs/en/payments/standard-process/callback), [Refund](https://api.bog.ge/docs/en/payments/refund), [Response codes](https://api.bog.ge/docs/en/payments/response-codes).
 
-This step covers **standard card payment** only (`payment_method: ["card"]`). Saved cards, refunds, Apple Pay, Google Pay, installments, and BNPL are not implemented.
+This step covers **standard card payment** and **admin-only card refunds**. Saved cards, Apple Pay, Google Pay, installments, BNPL, and customer self-service refunds are not implemented.
 
 ## Architecture
 
@@ -58,6 +58,7 @@ Retries of the **same** attempt reuse the stored idempotency key. A new retry af
 | `processing` | `processing` | `processing` |
 | `completed` | `paid` | `paid` |
 | `rejected` | `failed` | `failed` |
+| `refund_requested` | attempt stays `paid` if already paid; `PaymentRefund` is `processing` | unchanged until details confirm |
 | `refunded` | `refunded` | `refunded` |
 | `refunded_partially` | `partially_refunded` | `partially_refunded` |
 
@@ -65,7 +66,19 @@ Paid attempts are not overwritten by a later `rejected`. Order fulfillment statu
 
 ## Reconciliation
 
-`reconcileBogPaymentDetails` is shared by the callback, the customer return pages, and admin **გადახდის სტატუსის განახლება**. It checks provider order id, Pika order number, currency, and amounts (tetri). Admins cannot toggle a BOG payment to paid by hand.
+`reconcileBogPaymentDetails` is shared by the callback, the customer return pages, and admin **გადახდის სტატუსის განახლება**. It checks provider order id, Pika order number, currency, and amounts (tetri). Admins cannot toggle a BOG payment to paid or refunded by hand.
+
+## Admin refunds
+
+Admins can request a full or partial card refund from `/admin/orders/[id]` (**თანხის დაბრუნება**). The action calls `requireAdminAction()`, creates a `PaymentRefund` row with a UUID v4 `Idempotency-Key`, then `POST /payments/v1/payment/refund/:order_id`.
+
+- Full refund omits `amount` (BOG refunds the processed payment).
+- Partial refund sends documented `amount` and cannot exceed remaining refundable (`processed − refund_amount − in-flight`).
+- BOG `request_received` only means the request was accepted. Persist `action_id` and set the refund to `processing`. Final `REFUNDED` / `PARTIALLY_REFUNDED` comes from Payment Details / the signed callback (`refunded`, `refunded_partially`).
+- Refunds cannot be cancelled after initiation. Order fulfillment status is not changed to cancelled.
+- Without BOG credentials, the admin UI still shows history; submitting a refund returns that refunds are unavailable. Success is not faked.
+
+Use the existing **გადახდის სტატუსის განახლება** after a refund to pull current BOG state.
 
 ## Customer URLs
 
@@ -96,4 +109,4 @@ Landing on success does **not** mark the order paid.
 
 ## Local tests
 
-`npm run test:payments` — mapping, payload, amounts, signature (local test keys only), rejected callback behavior. Does not call live BOG.
+`npm run test:payments` — mapping, payload, amounts, refund request body, remaining refundable amount, signature (local test keys only), rejected callback behavior. Does not call live BOG.

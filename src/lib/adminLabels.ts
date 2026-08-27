@@ -29,6 +29,13 @@ export const PAYMENT_METHOD_LABEL = {
   cash_on_delivery: "გადახდა მიწოდებისას",
 } as const;
 
+export const PAYMENT_REFUND_STATUS_LABEL = {
+  requested: "მოთხოვნილია",
+  processing: "მუშავდება",
+  completed: "დასრულებულია",
+  failed: "ვერ შესრულდა",
+} as const;
+
 export const DELIVERY_METHOD_LABEL = {
   standard: "სტანდარტული მიწოდება",
   express: "სწრაფი მიწოდება",

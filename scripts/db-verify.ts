@@ -365,7 +365,24 @@ async function main() {
   const paymentCount = await prisma.payment.count();
   assert(paymentCount >= 0, "Payment count query failed");
 
-  console.log("  Auth/order constraints: unique email, wishlist pair, order number, password reset tokens, order FK SET NULL, Customer.role, ProductImage.objectKey, Payment attempts");
+  const refundTable = await prisma.$queryRaw<{ exists: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'PaymentRefund'
+    ) AS exists
+  `;
+  assert(refundTable[0]?.exists, "PaymentRefund table is missing");
+
+  const refundStatusValues = await prisma.$queryRaw<{ value: string }[]>`
+    SELECT unnest(enum_range(NULL::"PaymentRefundStatus"))::text AS value
+  `;
+  const refundStatusSet = new Set(refundStatusValues.map((row) => row.value));
+  assert(
+    refundStatusSet.has("requested") && refundStatusSet.has("processing") && refundStatusSet.has("completed") && refundStatusSet.has("failed"),
+    "PaymentRefundStatus must include requested, processing, completed, failed",
+  );
+
+  console.log("  Auth/order constraints: unique email, wishlist pair, order number, password reset tokens, order FK SET NULL, Customer.role, ProductImage.objectKey, Payment attempts, PaymentRefund");
   console.log("Database verify passed.");
 }
 

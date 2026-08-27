@@ -58,6 +58,13 @@ enum PaymentAttemptStatus {
   partially_refunded
 }
 
+enum PaymentRefundStatus {
+  requested
+  processing
+  completed
+  failed
+}
+
 enum DeliveryMethod {
   standard
   express
@@ -506,6 +513,7 @@ model Customer {
   wishlistItems       WishlistItem[]
   reviews             Review[]
   passwordResetTokens PasswordResetToken[]
+  paymentRefunds      PaymentRefund[]
 
   @@index([email])
   @@index([phone])
@@ -642,16 +650,46 @@ model Payment {
   redirectUrl          String?
   rejectReason         String?
   lastError            String?
+  /// Cumulative refunded amount from BOG Payment Details `purchase_units.refund_amount`.
+  providerRefundAmount Decimal?              @db.Decimal(12, 2)
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   completedAt          DateTime?
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  refunds PaymentRefund[]
 
   @@unique([provider, providerOrderId])
   @@index([orderId, createdAt])
   @@index([providerOrderId])
   @@index([status])
+}
+
+/// One BOG refund request against a Payment. Partial refunds create multiple rows.
+model PaymentRefund {
+  id                 String              @id @default(cuid())
+  paymentId          String
+  provider           PaymentProvider     @default(bog)
+  providerActionId   String?
+  idempotencyKey     String              @unique
+  amount             Decimal             @db.Decimal(12, 2)
+  status             PaymentRefundStatus @default(requested)
+  providerStatus     String?
+  providerMessage    String?
+  adminNote          String?             @db.Text
+  lastError          String?
+  requestedByAdminId String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  completedAt        DateTime?
+
+  payment          Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  requestedByAdmin Customer? @relation(fields: [requestedByAdminId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerActionId])
+  @@index([paymentId, createdAt])
+  @@index([status])
+  @@index([requestedByAdminId])
 }
 
 model WishlistItem {

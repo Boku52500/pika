@@ -9,11 +9,16 @@ import type { BogCreateOrderBody } from "@/server/payments/bog/payload";
 import {
   bogCreateOrderResponseSchema,
   bogPaymentDetailsSchema,
+  bogRefundResponseSchema,
   bogZodIssues,
   canonicalizeBogPaymentDetails,
+  BOG_REFUND_ACCEPTED_KEY,
   type BogCreateOrderResponse,
   type BogPaymentDetails,
+  type BogRefundResponse,
 } from "@/server/payments/bog/schemas";
+import { buildBogRefundRequest } from "@/server/payments/bog/refundRequest";
+import type { Prisma } from "@/generated/prisma/client";
 
 function requireConfig() {
   const config = getBogConfig();
@@ -72,4 +77,55 @@ export async function getBogPaymentDetails(providerOrderId: string): Promise<Bog
     throw new BogApiError("BOG payment-details response was invalid", 200);
   }
   return canonicalizeBogPaymentDetails(parsed.data);
+}
+
+export async function refundBogPayment(input: {
+  providerOrderId: string;
+  idempotencyKey: string;
+  amount?: Prisma.Decimal | string | number | null;
+}): Promise<BogRefundResponse> {
+  const config = requireConfig();
+  const token = await getBogAccessToken(config);
+  const request = buildBogRefundRequest({
+    apiBaseUrl: config.apiBaseUrl,
+    providerOrderId: input.providerOrderId,
+    idempotencyKey: input.idempotencyKey,
+    amount: input.amount,
+  });
+  const raw = await bogFetchJson({
+    method: "POST",
+    url: request.url,
+    headers: {
+      ...request.headers,
+      Authorization: `Bearer ${token}`,
+    },
+    body: request.body,
+    event: "bog.refund_request_failed",
+  });
+
+  const parsed = bogRefundResponseSchema.safeParse(raw);
+  if (!parsed.success) {
+    logError("bog.refund_request_failed", {
+      reason: "invalid_refund_response",
+      providerOrderId: input.providerOrderId,
+      validationIssues: bogZodIssues(parsed.error),
+    });
+    throw new BogApiError("BOG refund response was invalid", 200);
+  }
+
+  const key = parsed.data.key.toLowerCase();
+  if (key !== BOG_REFUND_ACCEPTED_KEY) {
+    logError("bog.refund_request_failed", {
+      reason: "unexpected_refund_key",
+      providerOrderId: input.providerOrderId,
+      providerKey: key,
+    });
+    throw new BogApiError("BOG refund request was not accepted", 200, key);
+  }
+
+  return {
+    key,
+    message: parsed.data.message,
+    action_id: parsed.data.action_id,
+  };
 }

@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCart } from "@/hooks/useCart";
 import { usePromoCode } from "@/hooks/usePromoCode";
 import { formatPrice } from "@/lib/utils";
-import { paymentCopyFor } from "@/lib/paymentCopy";
+import { paymentCopyFor, customerFacingPaymentStatus } from "@/lib/paymentCopy";
 import { paymentMethods } from "@/lib/checkout";
 import type { PaymentPageData } from "@/lib/paymentView";
 
@@ -25,7 +25,10 @@ export function PaymentReturnClient({
   const { isLoggedIn } = useAuth();
   const { clear } = useCart();
   const { removeCode } = usePromoCode(0);
-  const status = data?.order.paymentStatus ?? (variant === "fail" ? "failed" : "pending");
+  const status = customerFacingPaymentStatus(
+    data?.order.paymentStatus ?? (variant === "fail" ? "failed" : "pending"),
+    data?.order.refundInProgress,
+  );
   const copy = paymentCopyFor(status);
 
   useEffect(() => {
@@ -67,7 +70,7 @@ export function PaymentReturnClient({
         <p className="text-small tnum text-text-faint">
           შეკვეთის ნომერი — <span className="font-semibold text-text">{data.order.id}</span>
         </p>
-        <PaymentStatusBadge status={data.order.paymentStatus} />
+        <PaymentStatusBadge status={status} />
       </div>
 
       <div className="mx-auto mt-10 max-w-2xl rounded-[var(--radius-md)] border border-border bg-surface p-5">

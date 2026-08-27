@@ -131,6 +131,40 @@ const bogPaymentDetailSchema = z
   .optional()
   .transform((value) => value ?? undefined);
 
+type BogAction = {
+  action_id: string;
+  action?: string;
+  status?: string;
+  amount?: string;
+};
+
+const bogActionObjectSchema = z
+  .object({
+    action_id: optionalBogString,
+    action: optionalBogString,
+    status: optionalBogString,
+    amount: optionalBogAmount,
+  })
+  .passthrough();
+
+const bogActionsSchema = z
+  .union([z.array(bogActionObjectSchema), z.null()])
+  .optional()
+  .transform((value): BogAction[] | undefined => {
+    if (value == null) return undefined;
+    const actions: BogAction[] = [];
+    for (const row of value) {
+      if (!row.action_id) continue;
+      actions.push({
+        action_id: row.action_id,
+        action: row.action?.toLowerCase(),
+        status: row.status?.toLowerCase(),
+        amount: row.amount,
+      });
+    }
+    return actions.length > 0 ? actions : undefined;
+  });
+
 /**
  * Canonical BOG payment-details object (GET /payments/v1/receipt/:order_id
  * and callback `body`). Extra documented provider fields are ignored, not rejected.
@@ -143,9 +177,20 @@ export const bogPaymentDetailsSchema = z
     order_status: bogOrderStatusSchema,
     purchase_units: bogPurchaseUnitsSchema,
     payment_detail: bogPaymentDetailSchema,
+    actions: bogActionsSchema,
     reject_reason: optionalBogString,
   })
   .passthrough();
+
+export const bogRefundResponseSchema = z
+  .object({
+    key: requiredBogString,
+    message: optionalBogString,
+    action_id: requiredBogString,
+  })
+  .passthrough();
+
+export const BOG_REFUND_ACCEPTED_KEY = "request_received";
 
 export const bogCallbackEnvelopeSchema = z
   .object({
@@ -195,7 +240,19 @@ export type BogPaymentDetails = {
     payment_option?: string;
     card_type?: string;
   };
+  actions?: Array<{
+    action_id: string;
+    action?: string;
+    status?: string;
+    amount?: string;
+  }>;
   reject_reason?: string;
+};
+
+export type BogRefundResponse = {
+  key: string;
+  message?: string;
+  action_id: string;
 };
 
 export type BogCallbackEnvelope = {
@@ -231,6 +288,7 @@ export function canonicalizeBogPaymentDetails(
           card_type: data.payment_detail.card_type,
         }
       : undefined,
+    actions: data.actions,
     reject_reason: data.reject_reason,
   };
 }

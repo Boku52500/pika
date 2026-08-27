@@ -6,6 +6,7 @@ import { bogConfigured } from "@/server/payments/bog/config";
 import { getBogPaymentDetails } from "@/server/payments/bog/client";
 import { isPaidAttemptStatus, isRetryableAttemptStatus } from "@/server/payments/bog/status";
 import { reconcileBogPaymentDetails } from "@/server/payments/reconcile";
+import { customerRefundSnapshot } from "@/server/payments/refundable";
 import { logWarn } from "@/server/log";
 import type { PaymentPageData, StorefrontPaymentAttempt } from "@/lib/paymentView";
 
@@ -43,10 +44,19 @@ async function maybeReconcileLatest(orderId: string): Promise<void> {
   if (!bogConfigured()) return;
   const latest = await prisma.payment.findFirst({
     where: { orderId, providerOrderId: { not: null } },
+    include: { refunds: { select: { status: true } } },
     orderBy: { createdAt: "desc" },
   });
   if (!latest?.providerOrderId) return;
-  if (latest.status === "paid" || latest.status === "refunded" || latest.status === "partially_refunded") return;
+  const refundInFlight = latest.refunds.some(
+    (row) => row.status === "requested" || row.status === "processing",
+  );
+  if (
+    !refundInFlight &&
+    (latest.status === "paid" || latest.status === "refunded" || latest.status === "partially_refunded")
+  ) {
+    return;
+  }
   try {
     const details = await getBogPaymentDetails(latest.providerOrderId);
     await reconcileBogPaymentDetails(details);
@@ -66,7 +76,10 @@ export async function getPaymentPageData(
 
   const row = await prisma.order.findUnique({
     where: { orderNumber },
-    include: { items: true, payments: { orderBy: { createdAt: "asc" } } },
+    include: {
+      items: true,
+      payments: { orderBy: { createdAt: "asc" }, include: { refunds: true } },
+    },
   });
   if (!row) return null;
 
@@ -76,7 +89,10 @@ export async function getPaymentPageData(
 
   const refreshed = await prisma.order.findUnique({
     where: { id: row.id },
-    include: { items: true, payments: { orderBy: { createdAt: "asc" } } },
+    include: {
+      items: true,
+      payments: { orderBy: { createdAt: "asc" }, include: { refunds: true } },
+    },
   });
   if (!refreshed) return null;
 
@@ -87,9 +103,10 @@ export async function getPaymentPageData(
     refreshed.paymentMethod === "card" &&
     !paid &&
     (latest ? isRetryableAttemptStatus(latest.status) : true);
+  const refundView = customerRefundSnapshot(refreshed.payments);
 
   return {
-    order: mapOrderToStorefront(refreshed),
+    order: { ...mapOrderToStorefront(refreshed), ...refundView },
     attempts,
     latestStatus: latest?.status ?? null,
     canRetry,

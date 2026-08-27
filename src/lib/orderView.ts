@@ -32,6 +32,8 @@ export type StorefrontOrder = {
   delivery: DeliveryAddress;
   paymentMethod: PaymentMethodId;
   installmentMonths: number | null;
+  refundInProgress?: boolean;
+  refundedAmount?: number | null;
 };
 
 const PRODUCT_VISUALS: readonly ProductVisual[] = [

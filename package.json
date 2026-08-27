@@ -16,7 +16,7 @@
     "db:verify": "tsx --tsconfig tsconfig.json scripts/db-verify.ts",
     "prod:verify": "tsx --tsconfig tsconfig.json scripts/prod-verify.ts",
     "admin:promote": "tsx --tsconfig tsconfig.json scripts/admin-promote.ts",
-    "test:payments": "tsx --tsconfig tsconfig.json --test src/server/payments/bog/status.test.ts src/server/payments/bog/payload.test.ts src/server/payments/bog/signature.test.ts src/server/payments/bog/schemas.test.ts",
+    "test:payments": "tsx --tsconfig tsconfig.json --test src/server/payments/bog/status.test.ts src/server/payments/bog/payload.test.ts src/server/payments/bog/signature.test.ts src/server/payments/bog/schemas.test.ts src/server/payments/bog/refundRequest.test.ts src/server/payments/refundable.test.ts src/server/payments/refundReconcile.test.ts",
     "db:studio": "prisma studio",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down"

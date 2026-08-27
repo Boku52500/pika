@@ -14,7 +14,9 @@ import { adminCardClass } from "@/components/admin/adminUi";
 import { ProductImage } from "@/components/product/ProductImage";
 import { OrderStatusForm } from "@/components/admin/OrderStatusForm";
 import { PaymentRefreshForm } from "@/components/admin/PaymentRefreshForm";
+import { PaymentRefundForm } from "@/components/admin/PaymentRefundForm";
 import { PAYMENT_STATUS_COPY } from "@/lib/paymentCopy";
+import { PAYMENT_REFUND_STATUS_LABEL } from "@/lib/adminLabels";
 import type { ProductVisual } from "@/types/product";
 
 export const metadata: Metadata = { title: "შეკვეთა" };
@@ -86,6 +88,18 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                   {PAYMENT_STATUS_COPY[payment.status]?.label ?? payment.status}
                 </p>
                 <dl className="mt-2 grid gap-1 text-text-muted">
+                  <div className="flex justify-between gap-3">
+                    <dt>გადახდილი თანხა</dt>
+                    <dd className="tnum font-medium text-text">{formatPrice(payment.amount)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt>დაბრუნებული თანხა</dt>
+                    <dd className="tnum font-medium text-text">{formatPrice(payment.refundedAmount)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt>დასაბრუნებელი დარჩენილი თანხა</dt>
+                    <dd className="tnum font-medium text-text">{formatPrice(payment.remainingAmount)}</dd>
+                  </div>
                   {payment.providerOrderId ? (
                     <div>
                       <dt className="text-label text-text-faint">BOG order id</dt>
@@ -136,6 +150,62 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                     </div>
                   ) : null}
                 </dl>
+                {payment.refunds.length > 0 ? (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <p className="text-label mb-2 font-medium text-text">დაბრუნების ისტორია</p>
+                    <ul className="flex flex-col gap-2">
+                      {payment.refunds.map((refund) => (
+                        <li key={refund.id} className="rounded-[var(--radius-sm)] bg-surface-2 p-2">
+                          <p className="font-medium text-text">
+                            {formatPrice(refund.amount)} · {PAYMENT_REFUND_STATUS_LABEL[refund.status]}
+                          </p>
+                          <dl className="mt-1 grid gap-0.5 text-label text-text-muted">
+                            {refund.providerActionId ? (
+                              <div>
+                                <dt className="text-text-faint">BOG action id</dt>
+                                <dd className="tnum break-all">{refund.providerActionId}</dd>
+                              </div>
+                            ) : null}
+                            {refund.providerStatus ? (
+                              <div>
+                                <dt className="text-text-faint">პროვაიდერის სტატუსი</dt>
+                                <dd>{refund.providerStatus}{refund.providerMessage ? ` — ${refund.providerMessage}` : ""}</dd>
+                              </div>
+                            ) : null}
+                            <div>
+                              <dt className="text-text-faint">მოთხოვნის თარიღი</dt>
+                              <dd>{formatGeorgianDate(new Date(refund.createdAt).getTime())}</dd>
+                            </div>
+                            {refund.completedAt ? (
+                              <div>
+                                <dt className="text-text-faint">დასრულება</dt>
+                                <dd>{formatGeorgianDate(new Date(refund.completedAt).getTime())}</dd>
+                              </div>
+                            ) : null}
+                            {refund.adminNote ? (
+                              <div>
+                                <dt className="text-text-faint">შენიშვნა</dt>
+                                <dd>{refund.adminNote}</dd>
+                              </div>
+                            ) : null}
+                          </dl>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {payment.provider === "bog" &&
+                (payment.status === "paid" || payment.status === "partially_refunded" || payment.status === "refunded") ? (
+                  <PaymentRefundForm
+                    paymentId={payment.id}
+                    orderNumber={order.orderNumber}
+                    paidAmount={payment.amount}
+                    refundedAmount={payment.refundedAmount}
+                    remainingAmount={payment.remainingAmount}
+                    providerOrderId={payment.providerOrderId}
+                    canRefund={payment.canRefund}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>

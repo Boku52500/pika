@@ -138,7 +138,8 @@ describe("bogPaymentDetailsSchema", () => {
     const data = canonicalizeBogPaymentDetails(parsed.data);
     assert.equal(data.order_id, "a767a276-cddd-43ec-9db3-9f9b39eee02d");
     assert.equal(data.order_status.key, "refunded");
-    assert.equal(data.purchase_units?.request_amount, "100.5");
+    assert.equal(data.purchase_units?.refund_amount, "100.5");
+    assert.equal(data.actions?.[0]?.action_id, "b70968ca-eda9-47ae-8811-26fd1ab733f8");
     assert.equal(data.payment_detail?.transfer_method?.key, "card");
     assert.equal(data.payment_detail?.transaction_id, "230513868679");
     assert.equal(data.reject_reason, undefined);
@@ -281,6 +282,42 @@ describe("bogCallbackEnvelopeSchema", () => {
       }).ok,
       true,
     );
+  });
+
+  it("parses refunded_partially callback bodies for reconciliation", () => {
+    const parsed = bogCallbackEnvelopeSchema.safeParse({
+      event: "order_payment",
+      zoned_request_time: "2022-11-23T18:06:37.240559Z",
+      body: {
+        ...completedCardPayment,
+        order_status: { key: "refunded_partially", value: "ნაწილობრივ დაბრუნებული" },
+        purchase_units: {
+          ...completedCardPayment.purchase_units,
+          transfer_amount: "5.40",
+          refund_amount: "5.50",
+        },
+      },
+    });
+    assert.equal(parsed.success, true);
+    if (!parsed.success) return;
+    const body = canonicalizeBogPaymentDetails(parsed.data.body);
+    assert.equal(mapBogStatusToAttempt(body.order_status.key), "partially_refunded");
+    assert.equal(body.purchase_units?.refund_amount, "5.50");
+  });
+
+  it("parses refund_requested callback bodies without treating them as paid/refunded", () => {
+    const parsed = bogCallbackEnvelopeSchema.safeParse({
+      event: "order_payment",
+      zoned_request_time: "2022-11-23T18:06:37.240559Z",
+      body: {
+        ...completedCardPayment,
+        order_status: { key: "refund_requested", value: "დაბრუნება მოთხოვნილია" },
+      },
+    });
+    assert.equal(parsed.success, true);
+    if (!parsed.success) return;
+    const body = canonicalizeBogPaymentDetails(parsed.data.body);
+    assert.equal(mapBogStatusToAttempt(body.order_status.key), "processing");
   });
 
   it("rejects a root-level payment object that is not wrapped", () => {

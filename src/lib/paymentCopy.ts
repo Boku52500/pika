@@ -1,7 +1,14 @@
 import type { PaymentAttemptStatus } from "@/generated/prisma/client";
 
 export const PAYMENT_STATUS_COPY: Record<
-  "unpaid" | "pending" | "processing" | "paid" | "failed" | "refunded" | "partially_refunded",
+  | "unpaid"
+  | "pending"
+  | "processing"
+  | "paid"
+  | "failed"
+  | "refunded"
+  | "partially_refunded"
+  | "refund_processing",
   { label: string; title: string; body: string }
 > = {
   unpaid: {
@@ -35,11 +42,24 @@ export const PAYMENT_STATUS_COPY: Record<
     body: "ამ გადახდაზე თანხა დაბრუნებულია.",
   },
   partially_refunded: {
-    label: "თანხა ნაწილობრივ დაბრუნებულია",
+    label: "ნაწილობრივ დაბრუნებულია",
     title: "თანხა ნაწილობრივ დაბრუნებულია",
     body: "ამ გადახდაზე თანხის ნაწილი დაბრუნებულია.",
   },
+  refund_processing: {
+    label: "თანხის დაბრუნება მუშავდება",
+    title: "თანხის დაბრუნება მუშავდება",
+    body: "ბანკი ამუშავებს თანხის დაბრუნებას. ეს ჯერ არ ნიშნავს, რომ თანხა უკვე დაბრუნებულია.",
+  },
 };
+
+export function customerFacingPaymentStatus(
+  status: string | null | undefined,
+  refundInProgress?: boolean,
+): string {
+  if (refundInProgress && status !== "refunded") return "refund_processing";
+  return status || "pending";
+}
 
 export function paymentCopyFor(
   status: string | null | undefined,

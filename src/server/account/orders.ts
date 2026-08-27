@@ -1,8 +1,10 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/db";
 import { moneyToNumber } from "@/server/money";
+import { customerRefundSnapshot } from "@/server/payments/refundable";
 import {
   asProductVisual,
   asTone,
@@ -72,6 +74,11 @@ type OrderRow = Awaited<ReturnType<typeof prisma.order.findFirst>> & {
     lineTotal: unknown;
     selectedVariants: unknown;
   }>;
+  payments?: Array<{
+    status: string;
+    providerRefundAmount?: Prisma.Decimal | string | number | null;
+    refunds?: Array<{ status: string; amount: Prisma.Decimal | string | number }>;
+  }>;
 };
 
 export function mapOrderToStorefront(order: NonNullable<OrderRow>): StorefrontOrder {
@@ -108,7 +115,17 @@ export function mapOrderToStorefront(order: NonNullable<OrderRow>): StorefrontOr
   };
 }
 
-const orderInclude = { items: true } as const;
+const orderInclude = {
+  items: true,
+  payments: { include: { refunds: true } },
+} as const;
+
+function toStorefront(order: NonNullable<OrderRow>) {
+  return {
+    ...mapOrderToStorefront(order),
+    ...customerRefundSnapshot(order.payments ?? []),
+  };
+}
 
 export async function listCustomerOrders(customerId: string): Promise<StorefrontOrder[]> {
   const rows = await prisma.order.findMany({
@@ -116,7 +133,7 @@ export async function listCustomerOrders(customerId: string): Promise<Storefront
     include: orderInclude,
     orderBy: { createdAt: "desc" },
   });
-  return rows.map(mapOrderToStorefront);
+  return rows.map(toStorefront);
 }
 
 export async function getCustomerOrder(customerId: string, orderNumber: string): Promise<StorefrontOrder | null> {
@@ -124,7 +141,7 @@ export async function getCustomerOrder(customerId: string, orderNumber: string):
     where: { customerId, orderNumber },
     include: orderInclude,
   });
-  return row ? mapOrderToStorefront(row) : null;
+  return row ? toStorefront(row) : null;
 }
 
 export async function getOrderForConfirmation(
@@ -140,13 +157,13 @@ export async function getOrderForConfirmation(
   if (!row) return null;
 
   if (customerId && row.customerId === customerId) {
-    return mapOrderToStorefront(row);
+    return toStorefront(row);
   }
 
   const jar = await cookies();
   const token = jar.get(ORDER_CONFIRM_COOKIE)?.value;
   if (token && token === row.orderNumber) {
-    return mapOrderToStorefront(row);
+    return toStorefront(row);
   }
 
   return null;

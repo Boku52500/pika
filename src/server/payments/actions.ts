@@ -13,6 +13,8 @@ import { getBogPaymentDetails } from "@/server/payments/bog/client";
 import { PaymentUserError, startBogPaymentForOrder } from "@/server/payments/initiate";
 import { customerCanAccessOrder } from "@/server/payments/access";
 import { reconcileBogPaymentDetails } from "@/server/payments/reconcile";
+import { parseAdminRefundInput } from "@/server/payments/refundable";
+import { requestAdminBogRefund } from "@/server/payments/refund";
 
 export async function retryOrderPayment(
   input: unknown,
@@ -83,4 +85,20 @@ export async function refreshAdminOrderPayment(input: unknown): Promise<ActionRe
     logError("payment.admin_refresh_failed", { error, orderNumber: order.orderNumber });
     return { ok: false, message: GENERIC_SERVER_ERROR };
   }
+}
+
+export async function refundAdminOrderPayment(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+
+  const parsed = parseAdminRefundInput(input);
+  if ("error" in parsed) return { ok: false, message: parsed.error };
+
+  return requestAdminBogRefund({
+    paymentId: parsed.paymentId,
+    kind: parsed.kind,
+    amountRaw: parsed.amountRaw,
+    adminNote: parsed.adminNote,
+    adminId: gate.admin.id,
+  });
 }

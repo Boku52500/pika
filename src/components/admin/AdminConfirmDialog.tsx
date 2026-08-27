@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId } from "react";
+import { useEffect, useId, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 
 export function AdminConfirmDialog({
@@ -11,6 +11,8 @@ export function AdminConfirmDialog({
   cancelLabel = "გაუქმება",
   pending = false,
   danger = false,
+  confirmDisabled = false,
+  children,
   onClose,
   onConfirm,
 }: {
@@ -21,6 +23,8 @@ export function AdminConfirmDialog({
   cancelLabel?: string;
   pending?: boolean;
   danger?: boolean;
+  confirmDisabled?: boolean;
+  children?: ReactNode;
   onClose: () => void;
   onConfirm: () => void;
 }) {
@@ -59,6 +63,7 @@ export function AdminConfirmDialog({
         <p id={descId} className="text-small mt-2 text-text-muted">
           {description}
         </p>
+        {children ? <div className="mt-4">{children}</div> : null}
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>
             {cancelLabel}
@@ -66,7 +71,7 @@ export function AdminConfirmDialog({
           <Button
             type="button"
             onClick={onConfirm}
-            disabled={pending}
+            disabled={pending || confirmDisabled}
             className={danger ? "bg-danger-600 hover:bg-danger-600/90" : undefined}
           >
             {pending ? "მიმდინარეობს..." : confirmLabel}

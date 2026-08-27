@@ -12,6 +12,7 @@ describe("mapBogStatusToAttempt", () => {
     assert.equal(mapBogStatusToAttempt("processing"), "processing");
     assert.equal(mapBogStatusToAttempt("completed"), "paid");
     assert.equal(mapBogStatusToAttempt("rejected"), "failed");
+    assert.equal(mapBogStatusToAttempt("refund_requested"), "processing");
     assert.equal(mapBogStatusToAttempt("refunded"), "refunded");
     assert.equal(mapBogStatusToAttempt("refunded_partially"), "partially_refunded");
   });
@@ -23,13 +24,24 @@ describe("shouldApplyAttemptStatus", () => {
     assert.equal(shouldApplyAttemptStatus("paid", "paid"), true);
     assert.equal(shouldApplyAttemptStatus("failed", "paid"), true);
   });
+
+  it("lets paid become refunded or partially refunded, but not processing", () => {
+    assert.equal(shouldApplyAttemptStatus("paid", "refunded"), true);
+    assert.equal(shouldApplyAttemptStatus("paid", "partially_refunded"), true);
+    assert.equal(shouldApplyAttemptStatus("paid", "processing"), false);
+    assert.equal(shouldApplyAttemptStatus("refunded", "paid"), false);
+  });
 });
 
 describe("deriveOrderPaymentStatus", () => {
-  it("prefers paid over later failed attempts", () => {
+  it("prefers refunded over paid and partial", () => {
     assert.equal(
-      deriveOrderPaymentStatus([{ status: "paid" }, { status: "failed" }]),
-      "paid",
+      deriveOrderPaymentStatus([{ status: "paid" }, { status: "partially_refunded" }]),
+      "partially_refunded",
+    );
+    assert.equal(
+      deriveOrderPaymentStatus([{ status: "partially_refunded" }, { status: "refunded" }]),
+      "refunded",
     );
   });
 
