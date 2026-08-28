@@ -20,6 +20,7 @@ import { requestBogSavedCardEnrollment } from "@/server/payments/bog/savedCard";
 import { isOnlineBogMethod } from "@/server/payments/methods";
 import { validateBogSplitPayments, parseSplitRecipientsEnv } from "@/server/payments/bog/split";
 import { resolveCaptureMode, resolveCreateOrderPaymentMethods } from "@/server/payments/bog/policy";
+import { resolveBogCreateOrderLoan } from "@/lib/bogSdk";
 
 export { PaymentUserError };
 
@@ -258,8 +259,9 @@ export async function startBogPaymentForOrder(
           captureMode: capture,
           savedPaymentMethodId: options.savedPaymentMethodId,
           parentProviderOrderId: options.parentOrderId,
-          loanMonth: options.loan?.month,
-          loanDiscountCode: options.loan?.type,
+          ...(options.loan
+            ? { loanMonth: options.loan.month, loanDiscountCode: options.loan.type }
+            : {}),
         },
       });
     }
@@ -290,8 +292,13 @@ export async function startBogPaymentForOrder(
   if (options.applePayExternal) {
     config.apple_pay = { external: true };
   }
-  if (options.loan) {
-    config.loan = { month: options.loan.month, type: options.loan.type };
+  const loan = resolveBogCreateOrderLoan({
+    fromCalculator: options.loan,
+    storedMonth: payment.loanMonth,
+    storedType: payment.loanDiscountCode,
+  });
+  if (loan) {
+    config.loan = { month: loan.month, type: loan.type };
   }
   if (split) config.split = split;
 

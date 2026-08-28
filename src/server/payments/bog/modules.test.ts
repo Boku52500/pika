@@ -158,6 +158,15 @@ describe("create-order payload extensions", () => {
     assert.equal(loan.config?.loan?.month, 12);
     assert.equal(loan.config?.loan?.type, "DISC");
 
+    const bnpl = buildBogCreateOrderBody({
+      ...base,
+      paymentMethods: ["bnpl"],
+      config: { loan: { month: 4, type: "BNPL" } },
+    });
+    assert.deepEqual(bnpl.payment_method, ["bnpl"]);
+    assert.equal(bnpl.config?.loan?.month, 4);
+    assert.equal(bnpl.config?.loan?.type, "BNPL");
+
     const split = buildBogCreateOrderBody({
       ...base,
       capture: "manual",

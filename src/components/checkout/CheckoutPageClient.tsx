@@ -25,7 +25,7 @@ import { CheckoutStickyMobileBar } from "./CheckoutStickyMobileBar";
 import { requestGooglePayToken } from "./googlePay";
 import { completeApplePaySheet } from "./applePay";
 import { loadBogCalculatorSdk, openBogInstallmentCalculator } from "./bogCalculator";
-import { bogCalculatorUserMessage, isBogCalculatorCancelled, logCalculatorDiag } from "@/lib/bogSdk";
+import { bogCalculatorUserMessage, isBogCalculatorCancelled } from "@/lib/bogSdk";
 import { acceptApplePayPayment } from "@/server/payments/actions";
 import type { PublicCheckoutCapabilities, SavedCheckoutCard } from "@/lib/checkout";
 
@@ -179,21 +179,11 @@ export function CheckoutPageClient({
           amount: total,
           bnpl: bogCalculatorBnplFlag(form.state.paymentMethod),
           onRequest: async (selected) => {
-            logCalculatorDiag("checkout_create_order_started", {
-              bnpl: form.state.paymentMethod === "bnpl",
-              hasMonth: Boolean(selected.month),
-              hasDiscountCode: Boolean(selected.discount_code),
-            });
             setLoanMonth(selected.month);
             setLoanDiscountCode(selected.discount_code);
             const result = await createOrder(
               orderPayload({ loanMonth: selected.month, loanDiscountCode: selected.discount_code }),
             );
-            logCalculatorDiag("checkout_create_order_finished", {
-              ok: result.ok,
-              hasProviderOrderId: Boolean(result.ok && result.data.providerOrderId),
-              hasOrderNumber: Boolean(result.ok && result.data.orderNumber) || Boolean(!result.ok && result.orderNumber),
-            });
             if (!result.ok) {
               throw new Error(result.message);
             }
@@ -208,7 +198,6 @@ export function CheckoutPageClient({
           },
         });
         if (finished.cancelled) {
-          logCalculatorDiag("checkout_returned_after_cancel");
           setSubmitting(false);
           return;
         }
@@ -216,10 +205,7 @@ export function CheckoutPageClient({
         rotateCheckoutIdempotencyKey();
         setOrderPlaced(true);
         setSubmitting(false);
-        const next =
-          finished.sdkRedirectUrl ||
-          `/checkout/payment/success?order=${encodeURIComponent(finished.orderNumber)}`;
-        window.location.assign(next);
+        router.push(`/checkout/payment/success?order=${encodeURIComponent(finished.orderNumber)}`);
         return;
       }
 
@@ -273,7 +259,6 @@ export function CheckoutPageClient({
     } catch (error) {
       setSubmitting(false);
       if (isBogCalculatorCancelled(error)) {
-        logCalculatorDiag("checkout_catch_cancelled");
         return;
       }
       const message = bogCalculatorUserMessage(error);

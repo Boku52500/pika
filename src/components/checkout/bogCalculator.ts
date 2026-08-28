@@ -1,11 +1,9 @@
 "use client";
 
-import { bogCalculatorBnplFlag } from "@/lib/checkout";
 import {
-  bogCalculatorScriptId,
+  BOG_CALCULATOR_SCRIPT_ID,
   bogCalculatorScriptUrl,
-  classifyCalculatorOnClose,
-  logCalculatorDiag,
+  isValidBogCalculatorAmount,
 } from "@/lib/bogSdk";
 
 type BogCalculatorSelected = { amount?: number; month?: number; discount_code?: string };
@@ -21,106 +19,130 @@ export type BogCalculatorSessionResult =
   | { cancelled: true }
   | (BogLoanOrderResult & { cancelled: false; sdkRedirectUrl?: string });
 
-export { bogCalculatorBnplFlag };
-
 function getBogCalculator(): BogCalculatorApi | undefined {
-  return (window as unknown as { BOG?: { Calculator?: BogCalculatorApi } }).BOG?.Calculator;
+  const root = globalThis as typeof globalThis & {
+    BOG?: { Calculator?: BogCalculatorApi };
+    window?: { BOG?: { Calculator?: BogCalculatorApi } };
+  };
+  return root.BOG?.Calculator ?? root.window?.BOG?.Calculator;
+}
+
+function isScriptElement(node: Element | null): node is HTMLScriptElement {
+  return Boolean(node && String(node.tagName).toLowerCase() === "script");
+}
+
+function findSdkScript(): HTMLScriptElement | null {
+  const byId = document.getElementById(BOG_CALCULATOR_SCRIPT_ID);
+  if (isScriptElement(byId)) return byId;
+  const bySrc = document.querySelector?.("script[src*=\"bog-sdk/bog-sdk.js\"]") ?? null;
+  return isScriptElement(bySrc) ? bySrc : null;
 }
 
 let loadPromise: Promise<BogCalculatorApi> | null = null;
 let loadClientId: string | null = null;
 
-function waitForCalculator(timeoutMs = 8000): Promise<BogCalculatorApi> {
-  return new Promise((resolve, reject) => {
-    const deadline = Date.now() + timeoutMs;
-    const tick = () => {
-      const calculator = getBogCalculator();
-      if (calculator?.open) {
-        resolve(calculator);
-        return;
-      }
-      if (Date.now() > deadline) {
-        reject(new Error("BOG calculator is unavailable"));
-        return;
-      }
-      window.setTimeout(tick, 50);
-    };
-    tick();
-  });
-}
-
-/** Load the official SDK once; do not insert a second script tag. */
+/** Load the official SDK once. Prefer the checkout page script tag if present. */
 export function loadBogCalculatorSdk(clientId: string): Promise<BogCalculatorApi> {
-  if (!clientId.trim()) {
-    return Promise.reject(new Error("BOG calculator is unavailable"));
-  }
-  if (loadPromise && loadClientId === clientId) return loadPromise;
+  const id = clientId.trim();
+  if (!id) return Promise.reject(new Error("BOG calculator is unavailable"));
+  if (loadPromise && loadClientId === id) return loadPromise;
 
-  loadClientId = clientId;
+  loadClientId = id;
   loadPromise = new Promise((resolve, reject) => {
-    const ready = getBogCalculator();
-    if (ready?.open) {
-      resolve(ready);
+    let settled = false;
+    const readyNow = getBogCalculator();
+    if (readyNow?.open) {
+      resolve(readyNow);
       return;
     }
 
-    const src = bogCalculatorScriptUrl(clientId);
-    const failLoad = (error: Error) => {
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
       loadPromise = null;
       loadClientId = null;
-      document.getElementById(bogCalculatorScriptId())?.remove();
       reject(error);
     };
 
-    const afterScript = () => {
-      void waitForCalculator()
-        .then(resolve)
-        .catch((error: unknown) => {
-          failLoad(error instanceof Error ? error : new Error("BOG calculator is unavailable"));
-        });
+    const finish = () => {
+      if (settled) return;
+      const calculator = getBogCalculator();
+      if (!calculator?.open) return;
+      settled = true;
+      resolve(calculator);
     };
 
-    const existing = document.getElementById(bogCalculatorScriptId()) as HTMLScriptElement | null;
+    const existing = findSdkScript();
     if (existing) {
-      if (existing.getAttribute("data-bog-sdk") === "error") {
-        existing.remove();
-      } else {
-        existing.addEventListener("load", afterScript, { once: true });
-        existing.addEventListener(
-          "error",
-          () => failLoad(new Error("BOG SDK failed")),
-          { once: true },
-        );
-        if (existing.getAttribute("data-bog-sdk") === "loaded") afterScript();
+      if (getBogCalculator()?.open) {
+        finish();
         return;
       }
+      existing.addEventListener("load", finish, { once: true });
+      existing.addEventListener("error", () => fail(new Error("BOG SDK failed")), { once: true });
+      const deadline = Date.now() + 8000;
+      const tick = () => {
+        if (getBogCalculator()?.open) {
+          finish();
+          return;
+        }
+        if (Date.now() > deadline) {
+          fail(new Error("BOG calculator is unavailable"));
+          return;
+        }
+        globalThis.setTimeout(tick, 50);
+      };
+      tick();
+      return;
     }
 
     const script = document.createElement("script");
-    script.id = bogCalculatorScriptId();
-    script.src = src;
-    script.async = true;
+    script.id = BOG_CALCULATOR_SCRIPT_ID;
+    script.src = bogCalculatorScriptUrl(id);
     script.onload = () => {
-      script.setAttribute("data-bog-sdk", "loaded");
-      afterScript();
+      script.dataset.bogSdk = "loaded";
+      finish();
+      if (settled) return;
+      const deadline = Date.now() + 8000;
+      const tick = () => {
+        if (getBogCalculator()?.open) {
+          finish();
+          return;
+        }
+        if (Date.now() > deadline) {
+          fail(new Error("BOG calculator is unavailable"));
+          return;
+        }
+        globalThis.setTimeout(tick, 50);
+      };
+      tick();
     };
-    script.onerror = () => {
-      script.setAttribute("data-bog-sdk", "error");
-      failLoad(new Error("BOG SDK failed"));
-    };
+    script.onerror = () => fail(new Error("BOG SDK failed"));
     document.head.appendChild(script);
   });
 
   return loadPromise;
 }
 
+export function resetBogCalculatorSdkLoader(): void {
+  loadPromise = null;
+  loadClientId = null;
+}
+
+/**
+ * Official `BOG.Calculator.open` from the modal docs. Only documented fields.
+ * selected.amount is monthly and must not be used as the order total.
+ */
 export function openBogInstallmentCalculator(input: {
   clientId: string;
   amount: number;
-  /** Official SDK: true = ნაწილ-ნაწილ only; false = განვადება only. Never omit. */
   bnpl: boolean;
   onRequest: (selected: { month: number; discount_code: string }) => Promise<BogLoanOrderResult>;
 }): Promise<BogCalculatorSessionResult> {
+  if (!isValidBogCalculatorAmount(input.amount)) {
+    return Promise.reject(new Error("გადახდის დაწყება ვერ მოხერხდა."));
+  }
+
   return new Promise((resolve, reject) => {
     let settled = false;
     let requesting = false;
@@ -129,84 +151,61 @@ export function openBogInstallmentCalculator(input: {
     const fail = (error: Error) => {
       if (settled) return;
       settled = true;
-      logCalculatorDiag("session_failed", { bnpl: input.bnpl, message: error.message === "closed" ? "closed" : "error" });
       reject(error);
     };
 
     const cancel = () => {
       if (settled) return;
       settled = true;
-      logCalculatorDiag("session_cancelled", { bnpl: input.bnpl });
       resolve({ cancelled: true });
     };
 
     void loadBogCalculatorSdk(input.clientId)
       .then((calculator) => {
         if (settled) return;
-        logCalculatorDiag("calculator_opened", { bnpl: input.bnpl });
         calculator.open({
           amount: input.amount,
           bnpl: input.bnpl,
           onClose: () => {
-            const kind = classifyCalculatorOnClose({
-              requesting,
-              hasCreatedOrder: Boolean(created),
-              settled,
-            });
-            logCalculatorDiag("onClose", {
-              bnpl: input.bnpl,
-              kind,
-              requesting,
-              hasCreatedOrder: Boolean(created),
-              settled,
-            });
-            if (kind === "cancel") cancel();
+            if (settled || requesting || created) return;
+            cancel();
           },
-          onRequest: (selected: BogCalculatorSelected, successCb: (orderId: string) => void, closeCb: () => void) => {
+          onRequest: (
+            selected: BogCalculatorSelected,
+            successCb: (orderId: string) => void,
+            closeCb: () => void,
+          ) => {
+            if (settled) return false;
+            if (created) {
+              successCb(created.providerOrderId);
+              return undefined;
+            }
+            if (requesting) return undefined;
             const month = Number(selected.month);
-            const discount_code = String(selected.discount_code ?? "");
-            logCalculatorDiag("onRequest", {
-              bnpl: input.bnpl,
-              hasMonth: Boolean(month),
-              hasDiscountCode: Boolean(discount_code),
-            });
+            const discount_code = String(selected.discount_code ?? "").trim();
             if (!month || !discount_code) {
-              logCalculatorDiag("onRequest_missing_terms", { bnpl: input.bnpl });
               closeCb();
-              fail(new Error("missing terms"));
+              fail(new Error("აირჩიეთ განვადების პირობები ბანკის კალკულატორიდან."));
               return false;
             }
             requesting = true;
-            logCalculatorDiag("pika_order_started", { bnpl: input.bnpl, hasMonth: true, hasDiscountCode: true });
             void input
               .onRequest({ month, discount_code })
               .then((result) => {
                 created = result;
                 requesting = false;
-                logCalculatorDiag("pika_order_succeeded", {
-                  bnpl: input.bnpl,
-                  hasProviderOrderId: Boolean(result.providerOrderId),
-                });
-                logCalculatorDiag("successCb", { bnpl: input.bnpl, hasProviderOrderId: true });
                 successCb(result.providerOrderId);
               })
               .catch((error: unknown) => {
                 requesting = false;
-                logCalculatorDiag("pika_order_failed", { bnpl: input.bnpl });
                 closeCb();
                 fail(error instanceof Error ? error : new Error("განვადების შეკვეთა ვერ შეიქმნა."));
               });
             return undefined;
           },
           onComplete: ({ redirectUrl }: { redirectUrl?: string }) => {
-            logCalculatorDiag("onComplete", {
-              bnpl: input.bnpl,
-              hasCreatedOrder: Boolean(created),
-              hasRedirectUrl: Boolean(redirectUrl),
-              settled,
-            });
             if (!created) {
-              fail(new Error("missing BOG order"));
+              fail(new Error("განვადების შეკვეთა ვერ შეიქმნა."));
               return false;
             }
             if (settled) return false;

@@ -9,6 +9,7 @@ import { orderSubmissionSchema } from "@/server/validation/order";
 import { firstZodMessage, isUniqueConstraintError } from "@/server/actions/helpers";
 import { GENERIC_SERVER_ERROR, type ActionResult } from "@/server/actions/result";
 import { moneyToNumber, numberToMoney } from "@/server/money";
+import { bogCalculatorLoanFromSdkSelection } from "@/lib/bogSdk";
 import { deliveryMethods, getDeliveryMethodFee } from "@/lib/checkout";
 import { DEFAULT_LOCALE } from "@/server/locale";
 import { ORDER_CONFIRM_COOKIE } from "@/server/account/orders";
@@ -44,7 +45,10 @@ async function bogStartOptions(
     if (!payload.loanMonth || !payload.loanDiscountCode) {
       throw new OrderUserError("აირჩიეთ განვადების პირობები ბანკის კალკულატორიდან.");
     }
-    options.loan = { month: payload.loanMonth, type: payload.loanDiscountCode };
+    options.loan = bogCalculatorLoanFromSdkSelection({
+      month: payload.loanMonth,
+      discount_code: payload.loanDiscountCode,
+    });
     options.paymentMethods = [payload.paymentMethod];
   }
   if (payload.paymentMethod === "saved_card") {
@@ -144,15 +148,18 @@ async function continueCardPayment(
   }
 }
 
-async function replayExistingCheckout(order: {
-  id: string;
-  orderNumber: string;
-  paymentMethod: string;
-  paymentStatus: string;
-}): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string; providerOrderId?: string; applePay?: { providerOrderId: string; result: unknown } }>> {
+async function replayExistingCheckout(
+  order: {
+    id: string;
+    orderNumber: string;
+    paymentMethod: string;
+    paymentStatus: string;
+  },
+  options?: StartBogPaymentOptions,
+): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string; providerOrderId?: string; applePay?: { providerOrderId: string; result: unknown } }>> {
   await setConfirmCookie(order.orderNumber);
   if (isOnlineBogMethod(order.paymentMethod) && !isPaidLikePaymentStatus(order.paymentStatus)) {
-    return continueCardPayment(order.id, order.orderNumber, { method: order.paymentMethod });
+    return continueCardPayment(order.id, order.orderNumber, options ?? { method: order.paymentMethod });
   }
   return { ok: true, data: { orderNumber: order.orderNumber } };
 }
@@ -207,7 +214,12 @@ export async function createOrder(
     select: { id: true, orderNumber: true, paymentMethod: true, paymentStatus: true },
   });
   if (existing) {
-    return replayExistingCheckout(existing);
+    try {
+      return await replayExistingCheckout(existing, await bogStartOptions(payload, session?.id ?? null));
+    } catch (error) {
+      if (error instanceof OrderUserError) return { ok: false, message: error.message };
+      throw error;
+    }
   }
 
   try {
@@ -412,7 +424,11 @@ export async function createOrder(
       }
 
       if (cardCheckout) {
-        await createPendingCardPayment(tx, { id: order.id, total: order.total }, { method: payload.paymentMethod });
+        await createPendingCardPayment(tx, { id: order.id, total: order.total }, {
+          method: payload.paymentMethod,
+          loanMonth: payload.loanMonth ?? undefined,
+          loanDiscountCode: payload.loanDiscountCode ?? undefined,
+        });
       }
 
       return { orderNumber: order.orderNumber, orderId: order.id, paymentMethod: payload.paymentMethod };
@@ -432,7 +448,7 @@ export async function createOrder(
         where: { checkoutIdempotencyKey: payload.checkoutIdempotencyKey },
         select: { id: true, orderNumber: true, paymentMethod: true, paymentStatus: true },
       });
-      if (replay) return replayExistingCheckout(replay);
+      if (replay) return replayExistingCheckout(replay, await bogStartOptions(payload, session?.id ?? null));
     }
     if (error instanceof OrderUserError || error instanceof PromoUserError || error instanceof InventoryUserError) {
       return { ok: false, message: error.message };

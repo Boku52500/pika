@@ -368,7 +368,7 @@ These values exist only on the Order Request `payment_method` list (no dedicated
 | Field | Value |
 | --- | --- |
 | Documentation | https://api.bog.ge/docs/en/payments/external-orders/modal |
-| Official endpoint(s) | SDK `https://webstatic.bog.ge/bog-sdk/bog-sdk.js?version=2&client_id={client_id}`; order still `POST /payments/v1/ecommerce/orders` with `payment_method: ["bog_loan"]` or `["bnpl"]` and `config.loan` (`type` = calculator `discount_code`, `month`) |
+| Official endpoint(s) | SDK `https://webstatic.bog.ge/bog-sdk/bog-sdk.js?client_id={client_id}` (do not pass `version=2`; the live SDK treats it as an API selector and 405s on v2 calculate). Order still `POST /payments/v1/ecommerce/orders` with `payment_method: ["bog_loan"]` or `["bnpl"]` and `config.loan` (`type` = calculator `discount_code`, `month`) |
 | HTTP method | SDK + standard create-order `POST` |
 | Authentication | SDK uses public `client_id`; order uses Bearer |
 | Important request fields | Calculator: `amount`, optional `bnpl`. `onRequest` returns `{ amount, month, discount_code }`. Pika must **not** compute interest or monthly amounts |
