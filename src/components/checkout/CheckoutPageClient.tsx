@@ -207,7 +207,7 @@ export function CheckoutPageClient({
             };
           },
         });
-        if ("cancelled" in finished && finished.cancelled) {
+        if (finished.cancelled) {
           logCalculatorDiag("checkout_returned_after_cancel");
           setSubmitting(false);
           return;

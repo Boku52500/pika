@@ -17,6 +17,10 @@ export type BogLoanOrderResult = {
   redirectUrl?: string;
 };
 
+export type BogCalculatorSessionResult =
+  | { cancelled: true }
+  | (BogLoanOrderResult & { cancelled: false; sdkRedirectUrl?: string });
+
 export { bogCalculatorBnplFlag };
 
 function getBogCalculator(): BogCalculatorApi | undefined {
@@ -116,7 +120,7 @@ export function openBogInstallmentCalculator(input: {
   /** Official SDK: true = ნაწილ-ნაწილ only; false = განვადება only. Never omit. */
   bnpl: boolean;
   onRequest: (selected: { month: number; discount_code: string }) => Promise<BogLoanOrderResult>;
-}): Promise<{ cancelled: true } | (BogLoanOrderResult & { sdkRedirectUrl?: string })> {
+}): Promise<BogCalculatorSessionResult> {
   return new Promise((resolve, reject) => {
     let settled = false;
     let requesting = false;
@@ -207,7 +211,7 @@ export function openBogInstallmentCalculator(input: {
             }
             if (settled) return false;
             settled = true;
-            resolve({ ...created, sdkRedirectUrl: redirectUrl });
+            resolve({ cancelled: false, ...created, sdkRedirectUrl: redirectUrl });
             return false;
           },
         });
