@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { customerInputSchema } from "@/server/validation/customer";
+import { MAX_CART_LINES } from "@/lib/cart";
+import { isCheckoutIdempotencyKey } from "@/lib/checkoutIdempotency";
 
 const addressSnapshotSchema = z.object({
   city: z.string().trim().min(1).max(80),
@@ -18,6 +20,10 @@ const selectedVariantSchema = z.object({
 
 export const orderSubmissionSchema = z.object({
   customerId: z.string().trim().min(1).nullable().optional(),
+  checkoutIdempotencyKey: z
+    .string()
+    .trim()
+    .refine(isCheckoutIdempotencyKey, "შეკვეთის იდენტიფიკატორი არასწორია"),
   customer: customerInputSchema,
   address: addressSnapshotSchema,
   deliveryMethod: z.enum(["standard", "express"]),
@@ -35,7 +41,8 @@ export const orderSubmissionSchema = z.object({
         selectedVariants: z.array(selectedVariantSchema).optional(),
       }),
     )
-    .min(1),
+    .min(1)
+    .max(MAX_CART_LINES, "კალათაში ძალიან ბევრი პოზიციაა"),
 });
 
 export type OrderSubmissionInput = z.infer<typeof orderSubmissionSchema>;

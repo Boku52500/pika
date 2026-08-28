@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { getAppOriginString } from "@/lib/appUrl";
 import { prisma } from "@/server/prisma";
 import { logError } from "@/server/log";
+import { INFO_PAGES } from "@/lib/infoPages";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [
     { url: origin, lastModified: new Date(), changeFrequency: "daily", priority: 1 },
   ];
+
+  for (const page of Object.values(INFO_PAGES)) {
+    if (page.needsAdminReview) continue;
+    entries.push({
+      url: `${origin}/${page.slug}`,
+      changeFrequency: "monthly",
+      priority: 0.4,
+    });
+  }
 
   try {
     const [categories, products] = await Promise.all([

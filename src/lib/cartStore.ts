@@ -18,13 +18,14 @@
  */
 
 import type { Product } from "@/types/product";
-import type { CartLineItem } from "@/lib/productSnapshots";
 import {
   CART_STORAGE_VERSION,
   buildLineId,
   cartSnapshotFromProduct,
   parseCartLineItem,
+  type CartLineItem,
 } from "@/lib/productSnapshots";
+import { MAX_CART_LINES } from "@/lib/cart";
 
 export type { CartLineItem } from "@/lib/productSnapshots";
 
@@ -113,6 +114,8 @@ function addItem(product: Product, quantity = 1, variants?: Record<string, strin
     writeStorage(next);
     return;
   }
+
+  if (current.length >= MAX_CART_LINES) return;
 
   writeStorage([
     ...current,

@@ -78,20 +78,17 @@ export function Footer() {
             <ul className="space-y-3">
               {socials.map(({ label, Icon, className }) => (
                 <li key={label}>
-                  <a
-                    href="#"
-                    className="group flex items-center gap-2.5 text-small text-ink-600 transition-colors hover:text-ink-900"
-                  >
+                  <span className="flex items-center gap-2.5 text-small text-ink-600">
                     <span
                       className={cn(
-                        "flex size-7 shrink-0 items-center justify-center rounded-full text-white transition-transform group-hover:scale-105",
+                        "flex size-7 shrink-0 items-center justify-center rounded-full text-white",
                         className
                       )}
                     >
                       <Icon className="size-3.5" strokeWidth={1.75} />
                     </span>
                     {label}
-                  </a>
+                  </span>
                 </li>
               ))}
             </ul>

@@ -6,7 +6,7 @@ import { getSessionCustomer } from "@/server/auth/session";
 import { clientIpFromHeaders, consumeRateLimit } from "@/server/auth/rateLimit";
 import { logError } from "@/server/log";
 import { orderSubmissionSchema } from "@/server/validation/order";
-import { firstZodMessage } from "@/server/actions/helpers";
+import { firstZodMessage, isUniqueConstraintError } from "@/server/actions/helpers";
 import { GENERIC_SERVER_ERROR, type ActionResult } from "@/server/actions/result";
 import { moneyToNumber, numberToMoney } from "@/server/money";
 import { deliveryMethods, getDeliveryMethodFee } from "@/lib/checkout";
@@ -18,6 +18,9 @@ import { bogConfigured, BOG_NOT_CONFIGURED_MESSAGE } from "@/server/payments/bog
 import { createPendingCardPayment, PaymentUserError, startBogPaymentForOrder } from "@/server/payments/initiate";
 import { scheduleEmail } from "@/server/email/schedule";
 import { notifyOrderConfirmation } from "@/server/email/notify";
+import { applyStockMutation, InventoryUserError } from "@/server/commerce/inventory";
+import { placePromotionRedemption, PromoUserError } from "@/server/commerce/promoRedemption";
+import { isPaidLikePaymentStatus } from "@/server/commerce/inventoryState";
 
 class OrderUserError extends Error {
   constructor(message: string) {
@@ -58,6 +61,47 @@ function variantMatches(
   );
 }
 
+function setConfirmCookie(orderNumber: string) {
+  return cookies().then((jar) => {
+    jar.set(ORDER_CONFIRM_COOKIE, orderNumber, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60,
+    });
+  });
+}
+
+async function continueCardPayment(orderId: string, orderNumber: string) {
+  try {
+    const { redirectUrl } = await startBogPaymentForOrder(orderId);
+    return { ok: true as const, data: { orderNumber, redirectUrl } };
+  } catch (error) {
+    if (error instanceof PaymentUserError) {
+      return { ok: false as const, message: error.message, orderNumber };
+    }
+    if (error instanceof InventoryUserError) {
+      return { ok: false as const, message: error.message, orderNumber };
+    }
+    logError("order.payment_start_failed", { error, orderNumber });
+    return { ok: false as const, message: GENERIC_SERVER_ERROR, orderNumber };
+  }
+}
+
+async function replayExistingCheckout(order: {
+  id: string;
+  orderNumber: string;
+  paymentMethod: string;
+  paymentStatus: string;
+}): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string }>> {
+  await setConfirmCookie(order.orderNumber);
+  if (order.paymentMethod === "card" && !isPaidLikePaymentStatus(order.paymentStatus)) {
+    return continueCardPayment(order.id, order.orderNumber);
+  }
+  return { ok: true, data: { orderNumber: order.orderNumber } };
+}
+
 export async function createOrder(
   input: unknown,
 ): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string }>> {
@@ -82,6 +126,15 @@ export async function createOrder(
     }
   }
   const promoCode = payload.promoCode?.trim().toUpperCase() || null;
+  const cardCheckout = payload.paymentMethod === "card";
+
+  const existing = await prisma.order.findUnique({
+    where: { checkoutIdempotencyKey: payload.checkoutIdempotencyKey },
+    select: { id: true, orderNumber: true, paymentMethod: true, paymentStatus: true },
+  });
+  if (existing) {
+    return replayExistingCheckout(existing);
+  }
 
   try {
     const placed = await prisma.$transaction(async (tx) => {
@@ -163,25 +216,6 @@ export async function createOrder(
           throw new OrderUserError(`სამწუხაროდ, ${productName} ამჟამად არ არის საკმარისი რაოდენობით.`);
         }
 
-        if (variantId) {
-          const updated = await tx.productVariant.updateMany({
-            where: { id: variantId, stockQuantity: { gte: item.quantity } },
-            data: { stockQuantity: { decrement: item.quantity } },
-          });
-          if (updated.count !== 1) {
-            throw new OrderUserError(`სამწუხაროდ, ${productName} ამჟამად არ არის საკმარისი რაოდენობით.`);
-          }
-        } else {
-          const updated = await tx.product.updateMany({
-            where: { id: product.id, stockQuantity: { gte: item.quantity } },
-            data: { stockQuantity: { decrement: item.quantity } },
-          });
-          if (updated.count !== 1) {
-            throw new OrderUserError(`სამწუხაროდ, ${productName} ამჟამად არ არის საკმარისი რაოდენობით.`);
-          }
-        }
-
-        const lineTotal = round2(unitPrice * item.quantity);
         lineSnapshots.push({
           productId: product.id,
           productName,
@@ -195,14 +229,25 @@ export async function createOrder(
           },
           unitPrice,
           quantity: item.quantity,
-          lineTotal,
+          lineTotal: round2(unitPrice * item.quantity),
           variantId,
         });
       }
 
+      await applyStockMutation(
+        tx,
+        lineSnapshots.map((line) => ({
+          productId: line.productId,
+          variantId: line.variantId,
+          quantity: line.quantity,
+        })),
+        "allocate",
+      );
+
       const subtotal = round2(lineSnapshots.reduce((sum, line) => sum + line.lineTotal, 0));
       let discount = 0;
       let storedPromo: string | null = null;
+      let promotionId: string | null = null;
 
       if (promoCode) {
         const promotion = await tx.promotion.findFirst({
@@ -213,11 +258,10 @@ export async function createOrder(
           Boolean(promotion) &&
           (!promotion?.startsAt || promotion.startsAt <= now) &&
           (!promotion?.endsAt || promotion.endsAt >= now);
-        const underLimit = !promotion?.usageLimit || promotion.usedCount < promotion.usageLimit;
         const minOk =
           !promotion?.minOrderAmount || subtotal >= moneyToNumber(promotion.minOrderAmount);
 
-        if (!promotion || !inWindow || !underLimit || !minOk) {
+        if (!promotion || !inWindow || !minOk) {
           throw new OrderUserError("პრომოკოდი არასწორია ან ვადაგასულია");
         }
 
@@ -227,10 +271,7 @@ export async function createOrder(
           discount = Math.min(subtotal, moneyToNumber(promotion.value));
         }
         storedPromo = promotion.code;
-        await tx.promotion.update({
-          where: { id: promotion.id },
-          data: { usedCount: { increment: 1 } },
-        });
+        promotionId = promotion.id;
       }
 
       const payableSubtotal = Math.max(0, round2(subtotal - discount));
@@ -249,6 +290,7 @@ export async function createOrder(
       const order = await tx.order.create({
         data: {
           orderNumber: number,
+          checkoutIdempotencyKey: payload.checkoutIdempotencyKey,
           customerId: session?.id ?? null,
           customerFirstName: payload.customer.firstName,
           customerLastName: payload.customer.lastName,
@@ -263,8 +305,9 @@ export async function createOrder(
           additionalInfo: payload.address.additionalInfo,
           deliveryMethod: payload.deliveryMethod,
           paymentMethod: payload.paymentMethod,
-          paymentStatus: payload.paymentMethod === "card" ? "pending" : "unpaid",
+          paymentStatus: cardCheckout ? "pending" : "unpaid",
           orderStatus: "pending",
+          inventoryState: cardCheckout ? "held" : "committed",
           subtotal: numberToMoney(subtotal),
           discount: numberToMoney(discount),
           deliveryFee: numberToMoney(deliveryFee),
@@ -274,6 +317,7 @@ export async function createOrder(
           items: {
             create: lineSnapshots.map((line) => ({
               productId: line.productId,
+              variantId: line.variantId,
               productName: line.productName,
               sku: line.sku,
               selectedVariants: line.selectedVariants,
@@ -285,40 +329,38 @@ export async function createOrder(
         },
       });
 
-      if (payload.paymentMethod === "card") {
+      if (promotionId) {
+        await placePromotionRedemption(tx, {
+          promotionId,
+          orderId: order.id,
+          event: cardCheckout ? "place_card" : "place_immediate",
+        });
+      }
+
+      if (cardCheckout) {
         await createPendingCardPayment(tx, { id: order.id, total: order.total });
       }
 
       return { orderNumber: order.orderNumber, orderId: order.id, paymentMethod: payload.paymentMethod };
     });
 
-    const jar = await cookies();
-    jar.set(ORDER_CONFIRM_COOKIE, placed.orderNumber, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60,
-    });
-
+    await setConfirmCookie(placed.orderNumber);
     scheduleEmail(() => notifyOrderConfirmation(placed.orderId));
 
     if (placed.paymentMethod === "card") {
-      try {
-        const { redirectUrl } = await startBogPaymentForOrder(placed.orderId);
-        return { ok: true, data: { orderNumber: placed.orderNumber, redirectUrl } };
-      } catch (error) {
-        if (error instanceof PaymentUserError) {
-          return { ok: false, message: error.message, orderNumber: placed.orderNumber };
-        }
-        logError("order.payment_start_failed", { error, orderNumber: placed.orderNumber });
-        return { ok: false, message: GENERIC_SERVER_ERROR, orderNumber: placed.orderNumber };
-      }
+      return continueCardPayment(placed.orderId, placed.orderNumber);
     }
 
     return { ok: true, data: { orderNumber: placed.orderNumber } };
   } catch (error) {
-    if (error instanceof OrderUserError) {
+    if (isUniqueConstraintError(error, "checkoutIdempotencyKey")) {
+      const replay = await prisma.order.findUnique({
+        where: { checkoutIdempotencyKey: payload.checkoutIdempotencyKey },
+        select: { id: true, orderNumber: true, paymentMethod: true, paymentStatus: true },
+      });
+      if (replay) return replayExistingCheckout(replay);
+    }
+    if (error instanceof OrderUserError || error instanceof PromoUserError || error instanceof InventoryUserError) {
       return { ok: false, message: error.message };
     }
     logError("order.create_failed", { error });

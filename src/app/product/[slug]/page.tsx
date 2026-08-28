@@ -12,8 +12,10 @@ import { ProductKeyFeatures } from "@/components/product/ProductKeyFeatures";
 import { ProductSpecs } from "@/components/product/ProductSpecs";
 import { ProductReviews } from "@/components/product/ProductReviews";
 import { ProductSection } from "@/components/product/ProductSection";
-import { loadStorefrontProductPage } from "@/server/catalog";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { getAppOriginString } from "@/lib/appUrl";
 import { noIndexRobots, pageCanonical } from "@/lib/seo";
+import { loadStorefrontProductPage } from "@/server/catalog";
 import {
   getDelivery,
   getDescription,
@@ -81,6 +83,32 @@ export default async function ProductPage({
   const reviews = getReviews(product);
   const ratingBreakdown = getRatingBreakdown(product);
   const outOfStock = product.availability === "out-of-stock";
+  const origin = getAppOriginString();
+  const imageUrls = images.map((image) => image.src).filter((src): src is string => Boolean(src));
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    sku,
+    url: `${origin}/product/${slug}`,
+    ...(imageUrls.length > 0 ? { image: imageUrls } : {}),
+    offers: {
+      "@type": "Offer",
+      url: `${origin}/product/${slug}`,
+      priceCurrency: "GEL",
+      price: String(product.price),
+      availability: outOfStock ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
+    },
+  };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "მთავარი", item: origin },
+      { "@type": "ListItem", position: 2, name: categoryName, item: `${origin}${categoryHref}` },
+      { "@type": "ListItem", position: 3, name: product.name, item: `${origin}/product/${slug}` },
+    ],
+  };
 
   const sections = [
     { id: "key-features", label: "ძირითადი მახასიათებლები", show: keyFeatures.length > 0 },
@@ -93,6 +121,7 @@ export default async function ProductPage({
 
   return (
     <>
+      <JsonLd data={[productJsonLd, breadcrumbJsonLd]} />
       <Container className="py-4">
         <Breadcrumbs items={[{ label: categoryName, href: categoryHref }, { label: product.name }]} />
       </Container>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { adminSelectClass } from "@/components/admin/adminUi";
 import { ORDER_STATUS_LABEL } from "@/lib/adminLabels";
+import { AdminConfirmDialog } from "@/components/admin/AdminConfirmDialog";
 import { updateAdminOrderStatus } from "@/server/actions/admin";
 import type { OrderStatus } from "@/generated/prisma/client";
 
@@ -16,12 +17,14 @@ export function OrderStatusForm({ orderId, current }: { orderId: string; current
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   function submit() {
     setMessage(null);
     setSuccess(null);
     startTransition(async () => {
       const result = await updateAdminOrderStatus({ orderId, orderStatus: status });
+      setConfirmOpen(false);
       if (!result.ok) {
         setMessage(result.message);
         return;
@@ -29,6 +32,14 @@ export function OrderStatusForm({ orderId, current }: { orderId: string; current
       setSuccess("სტატუსი განახლდა. გადახდის სტატუსი არ შეცვლილა.");
       router.refresh();
     });
+  }
+
+  function requestSubmit() {
+    if (status === "cancelled") {
+      setConfirmOpen(true);
+      return;
+    }
+    submit();
   }
 
   return (
@@ -48,12 +59,22 @@ export function OrderStatusForm({ orderId, current }: { orderId: string; current
             ))}
           </select>
         </label>
-        <Button type="button" onClick={submit} disabled={pending || status === current}>
+        <Button type="button" onClick={requestSubmit} disabled={pending || status === current}>
           {pending ? "ინახება..." : "სტატუსის შენახვა"}
         </Button>
       </div>
       {message ? <p role="alert" className="text-small text-danger-600">{message}</p> : null}
       {success ? <p role="status" className="text-small text-success-600">{success}</p> : null}
+      <AdminConfirmDialog
+        open={confirmOpen}
+        title="შეკვეთის გაუქმება"
+        description="გაუქმება არ ცვლის გადახდის სტატუსს. გადაუხდელი ბარათის შეკვეთის მარაგი დაბრუნდება; ნაღდი ანგარიშსწორების შეკვეთაზე მარაგი არ ბრუნდება."
+        confirmLabel="გაუქმება"
+        danger
+        pending={pending}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={submit}
+      />
     </div>
   );
 }

@@ -11,12 +11,6 @@ export function TopUtilityBar() {
           <span>
             მიწოდება: <span className="font-medium text-text-on-ink">თბილისი</span>
           </span>
-          <button
-            type="button"
-            className="ml-1 text-brand-300 underline-offset-2 hover:text-brand-200 hover:underline"
-          >
-            შეცვლა
-          </button>
         </div>
 
         <div className="flex items-center gap-5">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LayoutGrid, ChevronDown } from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 import { primaryNav } from "@/data/nav";
 import { Container } from "@/components/ui/Container";
 import { cn } from "@/lib/utils";
@@ -17,14 +17,10 @@ export function CategoryNav({ className }: { className?: string }) {
       className={cn("hidden border-b border-border bg-surface lg:block", className)}
     >
       <Container className="flex items-start">
-        <button
-          type="button"
-          className="text-nav mr-5 flex shrink-0 items-center gap-2 self-stretch border-r border-border py-3 pr-5 text-ink-900 transition-colors hover:text-brand-600 xl:mr-6 xl:pr-6"
-        >
+        <div className="text-nav mr-5 flex shrink-0 items-center gap-2 self-stretch border-r border-border py-3 pr-5 text-ink-900 xl:mr-6 xl:pr-6">
           <LayoutGrid className="size-[18px]" strokeWidth={2} />
           ყველა კატეგორია
-          <ChevronDown className="size-3.5" strokeWidth={2.25} />
-        </button>
+        </div>
 
         {/*
           Wraps instead of scrolling: with 12 categories there isn't always

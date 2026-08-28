@@ -23,6 +23,8 @@ import { revalidateCatalogue, revalidateOrders, revalidatePromotions } from "@/s
 import { scheduleEmail } from "@/server/email/schedule";
 import { notifyOrderStatus } from "@/server/email/notify";
 import { shouldSendOrderStatusEmail } from "@/server/email/events";
+import { applyInventoryEvent } from "@/server/commerce/inventory";
+import { applyPromoEvent } from "@/server/commerce/promoRedemption";
 import { PRODUCT_IMAGE_MAX_BYTES } from "@/lib/productImageLimits";
 import {
   STORAGE_NOT_CONFIGURED,
@@ -645,9 +647,15 @@ export async function updateAdminOrderStatus(input: unknown): Promise<ActionResu
     return { ok: true };
   }
 
-  await prisma.order.update({
-    where: { id: order.id },
-    data: { orderStatus: parsed.data.orderStatus },
+  await prisma.$transaction(async (tx) => {
+    await tx.order.update({
+      where: { id: order.id },
+      data: { orderStatus: parsed.data.orderStatus },
+    });
+    if (parsed.data.orderStatus === "cancelled") {
+      await applyInventoryEvent(tx, order.id, "unpaid_terminal");
+      await applyPromoEvent(tx, order.id, "unpaid_terminal");
+    }
   });
   revalidateOrders();
   if (shouldSendOrderStatusEmail(order.orderStatus, parsed.data.orderStatus)) {

@@ -21,10 +21,15 @@ export function MobileMenu({
     if (!open) return;
     const original = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = original;
+      document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, onClose]);
 
   return (
     <div
@@ -34,7 +39,9 @@ export function MobileMenu({
       )}
       aria-hidden={!open}
     >
-      <div
+      <button
+        type="button"
+        aria-label="მენიუს დახურვა"
         onClick={onClose}
         className={cn(
           "absolute inset-0 bg-ink-950/50 transition-opacity duration-200",
@@ -43,6 +50,9 @@ export function MobileMenu({
       />
 
       <div
+        role={open ? "dialog" : undefined}
+        aria-modal={open ? true : undefined}
+        aria-label="მენიუ"
         className={cn(
           "absolute inset-y-0 left-0 flex w-[86%] max-w-sm flex-col bg-surface shadow-lg transition-transform duration-250 ease-out",
           open ? "translate-x-0" : "-translate-x-full"

@@ -16,6 +16,7 @@ import type { Product } from "@/types/product";
 
 export const FREE_DELIVERY_THRESHOLD = 50;
 export const STANDARD_DELIVERY_FEE = 9.9;
+export const MAX_CART_LINES = 50;
 
 /** Rounds to cents — guards against floating point drift when summing many lines. */
 function round2(value: number): number {

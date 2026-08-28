@@ -13,6 +13,7 @@ import { useAddresses } from "@/hooks/useAddresses";
 import { deliveryMethods, getDeliveryMethodFee } from "@/lib/checkout";
 import { getCartTotal } from "@/lib/cart";
 import { createOrder } from "@/server/actions/orders";
+import { getCheckoutIdempotencyKey, rotateCheckoutIdempotencyKey } from "@/lib/checkoutIdempotency";
 import { toDeliveryAddress } from "@/lib/addressFormat";
 import { CustomerInfoSection } from "./CustomerInfoSection";
 import { DeliveryAddressSection } from "./DeliveryAddressSection";
@@ -91,6 +92,7 @@ export function CheckoutPageClient() {
     setSubmitting(true);
     setSubmitError(null);
     const result = await createOrder({
+      checkoutIdempotencyKey: getCheckoutIdempotencyKey(),
       customer: form.state.customer,
       address: {
         city: form.state.delivery.city,
@@ -119,11 +121,14 @@ export function CheckoutPageClient() {
     if (!result.ok) {
       setSubmitError(result.message);
       if (result.orderNumber) {
+        rotateCheckoutIdempotencyKey();
         setOrderPlaced(true);
         router.push(`/checkout/payment/fail?order=${encodeURIComponent(result.orderNumber)}`);
       }
       return;
     }
+
+    rotateCheckoutIdempotencyKey();
 
     if (result.data.redirectUrl) {
       setOrderPlaced(true);

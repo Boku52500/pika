@@ -14,6 +14,7 @@ import { planRefundRowUpdates, providerRefundAmountFromDetails } from "@/server/
 import { scheduleEmail } from "@/server/email/schedule";
 import { notifyPaymentPaid, notifyRefund } from "@/server/email/notify";
 import { planPaymentEmails } from "@/server/email/events";
+import { syncCommerceAfterPaymentReconciliation } from "@/server/commerce/sync";
 
 export type ReconcileResult = {
   paymentId: string;
@@ -176,6 +177,8 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
   } else if (plan === "refund_full") {
     scheduleEmail(() => notifyRefund(payment.id, "full"));
   }
+
+  await syncCommerceAfterPaymentReconciliation(payment.orderId);
 
   return {
     paymentId: payment.id,

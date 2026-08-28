@@ -10,6 +10,8 @@ import { BogNotConfiguredError } from "@/server/payments/bog/errors";
 import { buildBogCreateOrderBody } from "@/server/payments/bog/payload";
 import { isPaidAttemptStatus } from "@/server/payments/bog/status";
 import { bogCallbackUrl, bogCustomerFailUrl, bogCustomerSuccessUrl } from "@/server/payments/urls";
+import { applyInventoryEvent, InventoryUserError } from "@/server/commerce/inventory";
+import { releaseUnpaidCardCommerce } from "@/server/commerce/sync";
 
 const GENERIC_PAYMENT_ERROR = "გადახდის დაწყება ვერ მოხერხდა. სცადეთ ხელახლა.";
 
@@ -57,13 +59,6 @@ export async function createPendingCardPayment(
   });
 }
 
-async function loadOrder(orderId: string): Promise<OrderWithItems | null> {
-  return prisma.order.findUnique({
-    where: { id: orderId },
-    include: { items: true },
-  });
-}
-
 function latestUsableRedirect(payments: Array<{
   status: string;
   providerOrderId: string | null;
@@ -88,48 +83,75 @@ export async function startBogPaymentForOrder(orderId: string): Promise<{ redire
     throw new PaymentUserError(BOG_NOT_CONFIGURED_MESSAGE);
   }
 
-  const order = await loadOrder(orderId);
-  if (!order) throw new PaymentUserError("შეკვეთა ვერ მოიძებნა");
-  if (order.paymentMethod !== "card") {
-    throw new PaymentUserError("ეს შეკვეთა ბარათით გადასახდელი არ არის");
-  }
+  type Prepared =
+    | { kind: "reuse"; redirectUrl: string }
+    | { kind: "start"; paymentId: string; order: OrderWithItems };
 
-  const payments = await prisma.payment.findMany({
-    where: { orderId: order.id },
-    orderBy: { createdAt: "desc" },
-  });
-  if (payments.some((row) => isPaidAttemptStatus(row.status))) {
-    throw new PaymentUserError("ეს შეკვეთა უკვე გადახდილია");
-  }
-
-  const plan = latestUsableRedirect(payments);
-  if (plan?.kind === "paid") {
-    throw new PaymentUserError("ეს შეკვეთა უკვე გადახდილია");
-  }
-  if (plan?.kind === "reuse") {
-    return { redirectUrl: plan.redirectUrl };
-  }
-
-  let paymentId = plan?.kind === "retry-same" ? plan.paymentId : null;
-  let idempotencyKey = plan?.kind === "retry-same" ? plan.idempotencyKey : randomUUID();
-
-  if (!paymentId) {
-    const created = await prisma.payment.create({
-      data: {
-        orderId: order.id,
-        provider: "bog",
-        idempotencyKey,
-        status: "pending",
-        amount: order.total,
-        currency: "GEL",
-        method: "card",
-      },
+  const prepared: Prepared = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
     });
-    paymentId = created.id;
-    idempotencyKey = created.idempotencyKey;
+    if (!order) throw new PaymentUserError("შეკვეთა ვერ მოიძებნა");
+    if (order.paymentMethod !== "card") {
+      throw new PaymentUserError("ეს შეკვეთა ბარათით გადასახდელი არ არის");
+    }
+
+    const payments = await tx.payment.findMany({
+      where: { orderId: order.id },
+      orderBy: { createdAt: "desc" },
+    });
+    if (payments.some((row) => isPaidAttemptStatus(row.status))) {
+      throw new PaymentUserError("ეს შეკვეთა უკვე გადახდილია");
+    }
+
+    const plan = latestUsableRedirect(payments);
+    if (plan?.kind === "paid") {
+      throw new PaymentUserError("ეს შეკვეთა უკვე გადახდილია");
+    }
+    if (plan?.kind === "reuse") {
+      return { kind: "reuse" as const, redirectUrl: plan.redirectUrl };
+    }
+
+    if (order.inventoryState === "released") {
+      try {
+        await applyInventoryEvent(tx, order.id, "retry_payment");
+      } catch (error) {
+        if (error instanceof InventoryUserError) {
+          throw new PaymentUserError(error.message);
+        }
+        throw error;
+      }
+    }
+
+    let paymentId = plan?.kind === "retry-same" ? plan.paymentId : null;
+    const idempotencyKey = plan?.kind === "retry-same" ? plan.idempotencyKey : randomUUID();
+
+    if (!paymentId) {
+      const created = await tx.payment.create({
+        data: {
+          orderId: order.id,
+          provider: "bog",
+          idempotencyKey,
+          status: "pending",
+          amount: order.total,
+          currency: "GEL",
+          method: "card",
+        },
+      });
+      paymentId = created.id;
+    }
+
+    return { kind: "start" as const, paymentId, order };
+  });
+
+  if (prepared.kind === "reuse") {
+    return { redirectUrl: prepared.redirectUrl };
   }
 
-  const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
+  const order = prepared.order;
+  const payment = await prisma.payment.findUniqueOrThrow({ where: { id: prepared.paymentId } });
 
   const body = buildBogCreateOrderBody({
     callbackUrl: bogCallbackUrl(),
@@ -189,6 +211,7 @@ export async function startBogPaymentForOrder(orderId: string): Promise<{ redire
       where: { id: order.id },
       data: { paymentStatus: "failed" },
     });
+    await releaseUnpaidCardCommerce(order.id);
     logError("bog.order_create_failed", { error, orderNumber: order.orderNumber, paymentId: payment.id });
     throw new PaymentUserError(GENERIC_PAYMENT_ERROR);
   }
