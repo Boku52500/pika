@@ -42,7 +42,7 @@ If credentials are missing, the shop still runs. Choosing card payment returns a
 
 ## Create order
 
-Bearer auth, `Accept-Language: ka`, `Idempotency-Key` UUID v4, `payment_method: ["card","google_pay","apple_pay"]` (BOG hosted page; no `config.google_pay` / `config.apple_pay`), `capture: automatic`, `purchase_units.currency: GEL`, server-calculated `total_amount` and basket. `external_order_id` is the Pika order number.
+Bearer auth, `Accept-Language: ka`, `Idempotency-Key` UUID v4, `payment_method: ["card"]` plus flagged hosted methods (`google_pay`, `apple_pay`, `bog_p2p`, `bog_loyalty`), no `config.google_pay` / `config.apple_pay` on Card checkout, `capture: automatic`, `purchase_units.currency: GEL`, server-calculated `total_amount` and basket. `external_order_id` is the Pika order number.
 
 Retries of the **same** attempt reuse the stored idempotency key. A new retry after failure creates a new `Payment` and a new key. The Pika order is not duplicated.
 

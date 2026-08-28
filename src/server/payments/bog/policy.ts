@@ -14,13 +14,15 @@ export type HostedMethodCaps = {
 /**
  * Methods for Pika's standard "Card" checkout on BOG's hosted page.
  *
- * Official Order Request: `google_pay` is Google Pay + bank card; `apple_pay`
- * is Apple Pay + bank card. Do not omit `payment_method` — an empty list lets
- * BOG show every merchant-activated method (installment, BNPL, P2P, loyalty,
- * gift card). Do not set `config.google_pay.external` / `config.apple_pay.external`.
+ * `card` is always included. Hosted wallets / P2P / loyalty are added only
+ * when their flags are on. Do not omit `payment_method` — an empty list lets
+ * BOG show every merchant-activated method including loan/BNPL/gift card.
+ * Do not set `config.google_pay.external` / `config.apple_pay.external`.
  */
 export function hostedPaymentMethods(caps: HostedMethodCaps): BogPaymentMethodValue[] {
-  const methods = new Set<BogPaymentMethodValue>(["card", "google_pay", "apple_pay"]);
+  const methods = new Set<BogPaymentMethodValue>(["card"]);
+  if (caps.hostedGooglePay) methods.add("google_pay");
+  if (caps.hostedApplePay) methods.add("apple_pay");
   if (caps.hostedP2p) methods.add("bog_p2p");
   if (caps.hostedLoyalty) methods.add("bog_loyalty");
   if (caps.hostedGiftCard) methods.add("gift_card");

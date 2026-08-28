@@ -15,8 +15,8 @@ Do not set these true in production until the named party confirms.
 7. **Installment (`bog_loan`)** — merchant installment agreement, including any 0% plan. Then `BOG_INSTALLMENT_ENABLED=true`.
 8. **BNPL (`bnpl`)** — separate BNPL activation. Then `BOG_BNPL_ENABLED=true`.
 9. **Split payment** — activate split; main settlement account must cover transfers and fees; destination IBANs must be GEL accounts at local banks. Then `BOG_SPLIT_ENABLED=true` and configure destinations in `BogSplitRecipient` or `BOG_SPLIT_RECIPIENTS` JSON. Customers must never submit IBANs.
-10. **Hosted Google Pay** — Business Manager Google Pay onboarding + Google Terms of Service. Card checkout already sends `google_pay` on the hosted order; Pika does not draw a button. BOG shows Google Pay only if this product is activated. Keep `BOG_EXTERNAL_GOOGLE_PAY_ENABLED` off.
-11. **Hosted Apple Pay** — activate Apple Pay on the BOG payment page. Card checkout already sends `apple_pay` on the hosted order; Pika does not draw a button. BOG shows Apple Pay only if this product is activated. Keep `BOG_EXTERNAL_APPLE_PAY_ENABLED` off. Both `google_pay` and `apple_pay` must be activated for the shop, or BOG may reject the create-order (`payment_method` lists both).
+10. **Hosted Google Pay** — Business Manager Google Pay onboarding + Google Terms of Service. Then `BOG_HOSTED_GOOGLE_PAY_ENABLED=true`. The button appears on BOG’s payment page; Pika does not draw it. Keep `BOG_EXTERNAL_GOOGLE_PAY_ENABLED` off.
+11. **Hosted Apple Pay** — activate Apple Pay on the BOG payment page. Then `BOG_HOSTED_APPLE_PAY_ENABLED=true`. Pika does not draw a button. Keep `BOG_EXTERNAL_APPLE_PAY_ENABLED` off.
 12. **BOG P2P / loyalty / gift card** — activate each product, then `BOG_P2P_ENABLED` / `BOG_LOYALTY_ENABLED` / `BOG_GIFT_CARD_ENABLED`. They only appear on the BOG-hosted page.
 13. **Additional POS `config.account.tag`** — agree tag values with BOG if multiple ecommerce POS terminals exist. Not configured in Pika until then.
 
@@ -44,7 +44,7 @@ Official pages: [Apple Pay on Business' Webpage](https://api.bog.ge/docs/en/paym
 
 ## Environment flags (all new flags default off)
 
-Card checkout always requests hosted `google_pay` and `apple_pay` on BOG's page. `BOG_HOSTED_*` no longer changes that list. Keep `BOG_EXTERNAL_*` false so Pika does not render wallet buttons or send tokens.
+Hosted Card methods and calculator buttons follow these flags. Keep `BOG_EXTERNAL_*` false so Pika does not render wallet buttons or send tokens.
 
 ```
 BOG_HOSTED_GOOGLE_PAY_ENABLED=false

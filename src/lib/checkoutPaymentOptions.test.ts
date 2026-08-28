@@ -36,6 +36,9 @@ describe("visibleCheckoutPaymentMethods", () => {
       visibleCheckoutPaymentMethods({ ...capsOff, bogLoan: true }).map((method) => method.id),
       ["card", "bog_loan", "cash-on-delivery"],
     );
+  });
+
+  it("shows all four production checkout options when BNPL and installment flags are on", () => {
     assert.deepEqual(
       visibleCheckoutPaymentMethods({ ...capsOff, bnpl: true, bogLoan: true }).map((method) => method.id),
       ["card", "bnpl", "bog_loan", "cash-on-delivery"],
