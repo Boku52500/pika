@@ -2,13 +2,12 @@
 
 import { CreditCard, Landmark, Banknote, ShieldCheck, Wallet } from "lucide-react";
 import {
-  paymentMethods,
-  installmentProviders,
+  visibleCheckoutPaymentMethods,
   type PaymentMethodId,
   type PublicCheckoutCapabilities,
   type SavedCheckoutCard,
 } from "@/lib/checkout";
-import { formatPrice, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const iconByMethod: Record<PaymentMethodId, typeof CreditCard> = {
   card: CreditCard,
@@ -22,18 +21,13 @@ const iconByMethod: Record<PaymentMethodId, typeof CreditCard> = {
 };
 
 /**
- * Selectable payment-method cards, plus a method-specific info panel below
- * the grid — a safe "you'll pay securely after confirming" note for card
- * payments (no real card details are ever collected here), an installment
- * bank/term picker (UI only — structured for real providers later), and a
- * cash-on-delivery reminder.
+ * Checkout payment choices: Card (BOG hosted), ნაწილ-ნაწილ / განვადება when
+ * flagged, and existing cash-on-delivery. Google Pay / Apple Pay stay on BOG's
+ * hosted card page — Pika does not draw wallet buttons.
  */
 export function PaymentMethodSection({
   value,
   onChange,
-  installmentMonths,
-  onInstallmentMonthsChange,
-  total,
   error,
   capabilities,
   savedMethods = [],
@@ -46,9 +40,6 @@ export function PaymentMethodSection({
 }: {
   value: PaymentMethodId | null;
   onChange: (value: PaymentMethodId) => void;
-  installmentMonths: number | null;
-  onInstallmentMonthsChange: (months: number) => void;
-  total: number;
   error?: string;
   capabilities?: PublicCheckoutCapabilities | null;
   savedMethods?: SavedCheckoutCard[];
@@ -59,21 +50,14 @@ export function PaymentMethodSection({
   onSavedPaymentMethodId?: (id: string) => void;
   loanSummary?: string | null;
 }) {
+  const methods = visibleCheckoutPaymentMethods(capabilities);
   const visibleExtras: Array<{ id: PaymentMethodId; label: string; description: string }> = [];
-  if (capabilities?.externalGooglePay) {
-    visibleExtras.push({ id: "google_pay", label: "Google Pay", description: "გადახდა Pika-ს გვერდზე Google Pay-ით" });
-  }
-  if (capabilities?.externalApplePay) {
-    visibleExtras.push({ id: "apple_pay", label: "Apple Pay", description: "გადახდა Pika-ს გვერდზე Apple Pay-ით" });
-  }
-  if (capabilities?.bogLoan) {
-    visibleExtras.push({ id: "bog_loan", label: "საქართველოს ბანკის განვადება", description: "პირობებს ბანკის კალკულატორი აჩვენებს" });
-  }
-  if (capabilities?.bnpl) {
-    visibleExtras.push({ id: "bnpl", label: "BNPL", description: "Buy Now Pay Later საქართველოს ბანკის პირობებით" });
-  }
   if (capabilities?.savedCard && isLoggedIn && savedMethods.length > 0) {
-    visibleExtras.push({ id: "saved_card", label: "შენახული ბარათი", description: "გადახდა შენახული ბარათით, PAN-ის ხელახლა შეყვანის გარეშე" });
+    visibleExtras.push({
+      id: "saved_card",
+      label: "შენახული ბარათი",
+      description: "გადახდა შენახული ბარათით, PAN-ის ხელახლა შეყვანის გარეშე",
+    });
   }
 
   return (
@@ -87,7 +71,7 @@ export function PaymentMethodSection({
       </h2>
 
       <div role="radiogroup" aria-label="გადახდის მეთოდი" aria-required aria-invalid={Boolean(error)} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {paymentMethods.map((method) => {
+        {methods.map((method) => {
           const Icon = iconByMethod[method.id];
           const selected = value === method.id;
 
@@ -133,7 +117,8 @@ export function PaymentMethodSection({
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand-600" strokeWidth={1.75} />
           <p className="text-small text-text-muted">
             შეკვეთის დადასტურების შემდეგ გადახვალთ საქართველოს ბანკის უსაფრთხო გადახდის გვერდზე — ბარათის
-            მონაცემები ამ საიტზე არ ინახება და არ გროვდება.
+            მონაცემები ამ საიტზე არ ინახება და არ გროვდება. Google Pay და Apple Pay, თუ ხელმისაწვდომია,
+            იმ გვერდზე გამოჩნდება.
           </p>
         </div>
       ) : null}
@@ -142,43 +127,6 @@ export function PaymentMethodSection({
         <div className="flex items-start gap-2.5 rounded-[var(--radius-md)] border border-border bg-surface-2 p-4">
           <Banknote className="mt-0.5 size-4 shrink-0 text-brand-600" strokeWidth={1.75} />
           <p className="text-small text-text-muted">მზად გქონდეთ ზუსტი თანხა კურიერთან მიღებისას.</p>
-        </div>
-      ) : null}
-
-      {value === "installment" ? (
-        <div className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-dashed border-border-strong bg-surface-2 p-4">
-          <p className="text-small font-medium text-text">აირჩიეთ ბანკი და ვადა</p>
-          <div className="flex flex-wrap gap-2">
-            {installmentProviders.map((provider) =>
-              provider.months.map((months) => {
-                const selected = installmentMonths === months;
-                return (
-                  <button
-                    key={`${provider.id}-${months}`}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => onInstallmentMonthsChange(months)}
-                    className={cn(
-                      "text-small rounded-[var(--radius-sm)] border px-3.5 py-2 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400",
-                      selected ? "border-brand-600 bg-brand-50 text-brand-700" : "border-border-strong bg-surface text-text hover:border-ink-900"
-                    )}
-                  >
-                    {provider.name} · {months} თვე
-                  </button>
-                );
-              })
-            )}
-          </div>
-          {installmentMonths ? (
-            <p className="text-small tnum text-text-muted">
-              სავარაუდო გადასახდელი — <span className="font-semibold text-text">{formatPrice(total / installmentMonths)}</span>
-              /თვეში
-            </p>
-          ) : null}
-          <p className="text-label text-text-faint">
-            საბოლოო პირობებსა და საკომისიოს დაადასტურებთ ბანკთან შემდეგ ეტაპზე.
-          </p>
         </div>
       ) : null}
 
@@ -243,14 +191,6 @@ export function PaymentMethodSection({
           პირობებს ხსნის საქართველოს ბანკის კალკულატორი. Pika პროცენტს ან ყოველთვიურ თანხას არ ითვლის.
           {loanSummary ? ` არჩეული პირობა: ${loanSummary}` : ""}
         </p>
-      ) : null}
-
-      {value === "google_pay" ? (
-        <p className="text-small text-text-muted">შეკვეთის დადასტურებისას გაიხსნება Google Pay. ტოკენი სერვერზე არ ინახება.</p>
-      ) : null}
-
-      {value === "apple_pay" ? (
-        <p className="text-small text-text-muted">შეკვეთის დადასტურებისას გაიხსნება Apple Pay. ტოკენი სერვერზე არ ინახება.</p>
       ) : null}
     </section>
   );

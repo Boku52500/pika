@@ -60,6 +60,7 @@ export type StartBogPaymentOptions = {
 
 export type StartBogPaymentResult = {
   redirectUrl?: string;
+  providerOrderId?: string;
   applePay?: { providerOrderId: string; result: unknown };
   awaitingProvider?: boolean;
 };
@@ -110,7 +111,12 @@ function latestUsableRedirect(payments: Array<{
   }
   if (latest.status === "pending" || latest.status === "processing") {
     if (latest.providerOrderId && latest.redirectUrl) {
-      return { kind: "reuse" as const, redirectUrl: latest.redirectUrl, paymentId: latest.id };
+      return {
+        kind: "reuse" as const,
+        redirectUrl: latest.redirectUrl,
+        providerOrderId: latest.providerOrderId,
+        paymentId: latest.id,
+      };
     }
     if (latest.providerOrderId && latest.method === "apple_pay" && latest.providerSession) {
       return {
@@ -120,7 +126,7 @@ function latestUsableRedirect(payments: Array<{
       };
     }
     if (latest.providerOrderId) {
-      return { kind: "wait" as const };
+      return { kind: "wait" as const, providerOrderId: latest.providerOrderId };
     }
     return { kind: "retry-same" as const, paymentId: latest.id, idempotencyKey: latest.idempotencyKey };
   }
@@ -163,9 +169,9 @@ export async function startBogPaymentForOrder(
   const caps = getBogMerchantCapabilities();
 
   type Prepared =
-    | { kind: "reuse"; redirectUrl: string }
+    | { kind: "reuse"; redirectUrl: string; providerOrderId?: string }
     | { kind: "apple"; providerOrderId: string; result: unknown }
-    | { kind: "wait" }
+    | { kind: "wait"; providerOrderId?: string }
     | { kind: "start"; paymentId: string; order: OrderWithItems; method: string; capture: "automatic" | "manual" };
 
   const prepared: Prepared = await prisma.$transaction(async (tx) => {
@@ -203,13 +209,13 @@ export async function startBogPaymentForOrder(
       throw new PaymentUserError("ეს შეკვეთა უკვე გადახდილია");
     }
     if (plan?.kind === "reuse" && !options.googlePayToken && !options.applePayExternal) {
-      return { kind: "reuse" as const, redirectUrl: plan.redirectUrl };
+      return { kind: "reuse" as const, redirectUrl: plan.redirectUrl, providerOrderId: plan.providerOrderId };
     }
     if (plan?.kind === "apple" && !options.googlePayToken) {
       return { kind: "apple" as const, providerOrderId: plan.providerOrderId, result: plan.result };
     }
     if (plan?.kind === "wait" && !options.googlePayToken && !options.applePayExternal) {
-      return { kind: "wait" as const };
+      return { kind: "wait" as const, providerOrderId: plan.providerOrderId };
     }
 
     if (order.inventoryState === "released") {
@@ -262,13 +268,13 @@ export async function startBogPaymentForOrder(
   });
 
   if (prepared.kind === "reuse") {
-    return { redirectUrl: prepared.redirectUrl };
+    return { redirectUrl: prepared.redirectUrl, providerOrderId: prepared.providerOrderId };
   }
   if (prepared.kind === "apple") {
     return { applePay: { providerOrderId: prepared.providerOrderId, result: prepared.result } };
   }
   if (prepared.kind === "wait") {
-    return { awaitingProvider: true };
+    return { awaitingProvider: true, providerOrderId: prepared.providerOrderId };
   }
 
   const order = prepared.order;
@@ -370,9 +376,9 @@ export async function startBogPaymentForOrder(
       return { applePay: { providerOrderId: created.id, result: created.result } };
     }
     if (redirectUrl) {
-      return { redirectUrl };
+      return { redirectUrl, providerOrderId: created.id };
     }
-    return {};
+    return { providerOrderId: created.id };
   } catch (error) {
     if (error instanceof BogNotConfiguredError) {
       throw new PaymentUserError(BOG_NOT_CONFIGURED_MESSAGE);

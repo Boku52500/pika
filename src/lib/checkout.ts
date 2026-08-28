@@ -102,10 +102,34 @@ export interface PaymentMethodOption {
 }
 
 export const paymentMethods: PaymentMethodOption[] = [
-  { id: "card", label: "საბანკო ბარათი", description: "გადახდა საქართველოს ბანკის უსაფრთხო გადახდის გვერდზე" },
-  { id: "installment", label: "განვადება", description: "გადაანაწილეთ თანხა თვეებში ბანკის მეშვეობით" },
+  { id: "card", label: "ბარათით გადახდა", description: "გადახდა საქართველოს ბანკის უსაფრთხო გადახდის გვერდზე" },
+  { id: "bnpl", label: "ნაწილ-ნაწილ", description: "გადაიხადეთ ნაწილ-ნაწილ საქართველოს ბანკის პირობებით" },
+  { id: "bog_loan", label: "განვადება", description: "საქართველოს ბანკის სტანდარტული განვადება" },
   { id: "cash-on-delivery", label: "კურიერთან გადახდა", description: "გადაიხადეთ მიღებისას — ნაღდი ან ბარათით" },
+  { id: "installment", label: "განვადება", description: "გადაანაწილეთ თანხა თვეებში ბანკის მეშვეობით" },
 ];
+
+function methodById(id: PaymentMethodId): PaymentMethodOption {
+  const found = paymentMethods.find((method) => method.id === id);
+  if (!found) throw new Error(`Unknown payment method ${id}`);
+  return found;
+}
+
+/** Card + flagged BOG calculator options. Cash stays as the existing non-BOG path. No Pika wallet buttons. */
+export function visibleCheckoutPaymentMethods(
+  caps: PublicCheckoutCapabilities | null | undefined,
+): PaymentMethodOption[] {
+  const methods = [methodById("card")];
+  if (caps?.bnpl) methods.push(methodById("bnpl"));
+  if (caps?.bogLoan) methods.push(methodById("bog_loan"));
+  methods.push(methodById("cash-on-delivery"));
+  return methods;
+}
+
+/** Official SDK: `true` = payment-in-installments only; `false` = standard installment only. Never omit. */
+export function bogCalculatorBnplFlag(method: "bnpl" | "bog_loan"): boolean {
+  return method === "bnpl";
+}
 
 export type PublicCheckoutCapabilities = {
   card: boolean;
@@ -130,16 +154,3 @@ export type SavedCheckoutCard = {
   cardType: string | null;
   cardExpiry: string | null;
 };
-
-export interface InstallmentProvider {
-  id: string;
-  name: string;
-  months: number[];
-}
-
-/** UI-only placeholder list — structured so real Georgian bank integrations can be dropped in without redesigning the installment panel. */
-export const installmentProviders: InstallmentProvider[] = [
-  { id: "tbc", name: "თიბისი ბანკი", months: [3, 6, 9, 12] },
-  { id: "bog", name: "საქართველოს ბანკი", months: [3, 6, 10, 12] },
-  { id: "credo", name: "კრედო ბანკი", months: [3, 6, 12] },
-];

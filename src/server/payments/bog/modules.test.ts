@@ -347,11 +347,37 @@ describe("create-order payment_method selection", () => {
   };
 
   it("keeps hosted card+google_pay for standard card and isolates webpage/loan methods", () => {
-    assert.deepEqual(resolveCreateOrderPaymentMethods({ method: "card", caps }), ["card", "google_pay"]);
+    assert.deepEqual(resolveCreateOrderPaymentMethods({ method: "card", caps }), [
+      "card",
+      "google_pay",
+      "apple_pay",
+    ]);
     assert.deepEqual(resolveCreateOrderPaymentMethods({ method: "google_pay", caps }), ["google_pay"]);
     assert.deepEqual(resolveCreateOrderPaymentMethods({ method: "apple_pay", caps }), ["apple_pay"]);
     assert.deepEqual(resolveCreateOrderPaymentMethods({ method: "bog_loan", caps }), ["bog_loan"]);
     assert.deepEqual(resolveCreateOrderPaymentMethods({ method: "bnpl", caps }), ["bnpl"]);
+  });
+
+  it("requests hosted wallets on Card checkout even when hosted env flags are off", () => {
+    const flagsOff = {
+      hostedGooglePay: false,
+      hostedApplePay: false,
+      hostedP2p: false,
+      hostedLoyalty: false,
+      hostedGiftCard: false,
+    };
+    assert.deepEqual(resolveCreateOrderPaymentMethods({ method: "card", caps: flagsOff }), [
+      "card",
+      "google_pay",
+      "apple_pay",
+    ]);
+    assert.deepEqual(
+      resolveCreateOrderPaymentMethods({
+        method: "card",
+        caps: { ...flagsOff, hostedP2p: true, hostedLoyalty: true, hostedGiftCard: true },
+      }),
+      ["card", "google_pay", "apple_pay", "bog_p2p", "bog_loyalty", "gift_card"],
+    );
   });
 });
 

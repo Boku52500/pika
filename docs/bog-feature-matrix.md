@@ -84,10 +84,10 @@ Pika architecture (unchanged): `Order` is the merchant order; `Payment` is one f
 | payment_method | `card`, `google_pay`, `apple_pay`, `bog_p2p`, `bog_loyalty`, `bnpl`, `bog_loan`, `gift_card` |
 | Callback / reconciliation | `callback_url` required HTTPS; customer redirect is not final |
 | Merchant activation | Each listed `payment_method` must be activated for the shop |
-| Current Pika status | Card + `capture: automatic` + `payment_method: ["card"]` production-tested. Other methods extended in this work, default-off |
+| Current Pika status | Card checkout: `capture: automatic` + `payment_method: ["card","google_pay","apple_pay"]` (hosted wallets; no `config.*.external`). Other methods remain default-off |
 | Implementation | `src/server/payments/bog/payload.ts`, `client.ts`, `initiate.ts` |
 | DB | `Payment` attempt + `Order.checkoutIdempotencyKey` |
-| Checkout UI | Card always (when BOG configured). Extra hosted methods only when capability flags are on |
+| Checkout UI | Card always (when BOG configured). Pika does not draw wallet buttons. P2P/loyalty/gift card only when those flags are on |
 | Admin UI | Payment attempt list |
 | Production test status | Card: live. Other create-order configs: mocked tests only |
 | **Classification** | **IMPLEMENTED + TESTED** (card automatic). Hosted extras: **IMPLEMENTED + REQUIRES BOG ACTIVATION** |
@@ -542,7 +542,7 @@ These values exist only on the Order Request `payment_method` list (no dedicated
 | payment_method | `google_pay` |
 | Callback / reconciliation | Standard |
 | Merchant activation | Business Manager Google Pay onboarding + Google ToS |
-| Current Pika status | When `BOG_HOSTED_GOOGLE_PAY_ENABLED`, card create-order includes `google_pay` in `payment_method`. No Pika Google Pay button |
+| Current Pika status | Standard Card create-order always includes `google_pay` (with `card` and `apple_pay`). No Pika Google Pay button. `config.google_pay.external` is not sent |
 | Implementation | `src/server/payments/bog/capabilities.ts`, `payload.ts` |
 | DB | Unchanged (method comes back on details) |
 | Checkout UI | Still the card option; BOG page may show Google Pay |
@@ -604,7 +604,7 @@ See `src/server/payments/bog/capabilities.ts` and `docs/bog-onboarding.md`.
 
 ## Implementation notes (this change set)
 
-- Standard card create-order still defaults to `capture: automatic` and `payment_method: ["card"]` unless extra hosted methods are flagged. `capture=manual` is never applied to loan/BNPL/saved-card even if the preauth merchant flag is on.
+- Standard card create-order uses `capture: automatic` and `payment_method: ["card","google_pay","apple_pay"]` so BOG's hosted page can offer card + wallets without omitting `payment_method` (which would expose loan/BNPL/P2P/loyalty/gift card). `capture=manual` is never applied to loan/BNPL/saved-card even if the preauth merchant flag is on.
 - `blocked` maps to Pika `authorized` (inventory stays HELD). `partial_completed` maps to `paid`.
 - `request_received` on capture/reject/refund is stored as accepted, not completed.
 - Automatic saved-card charging is implemented as a provider function and remains workflow-disabled.

@@ -10,7 +10,7 @@ import { usePromoCode } from "@/hooks/usePromoCode";
 import { useCheckoutForm } from "@/hooks/useCheckoutForm";
 import { useAuth } from "@/hooks/useAuth";
 import { useAddresses } from "@/hooks/useAddresses";
-import { deliveryMethods, getDeliveryMethodFee } from "@/lib/checkout";
+import { bogCalculatorBnplFlag, deliveryMethods, getDeliveryMethodFee } from "@/lib/checkout";
 import { getCartTotal } from "@/lib/cart";
 import { createOrder } from "@/server/actions/orders";
 import { getCheckoutIdempotencyKey, rotateCheckoutIdempotencyKey } from "@/lib/checkoutIdempotency";
@@ -106,61 +106,86 @@ export function CheckoutPageClient({
 
     setSubmitting(true);
     setSubmitError(null);
+
+    const orderPayload = (extras: {
+      googlePayToken?: string | null;
+      loanMonth?: number | null;
+      loanDiscountCode?: string | null;
+    }) => ({
+      checkoutIdempotencyKey: getCheckoutIdempotencyKey(),
+      customer: form.state.customer,
+      address: {
+        city: form.state.delivery.city,
+        street: form.state.delivery.address,
+        building: form.state.delivery.building || undefined,
+        apartment: form.state.delivery.apartment || undefined,
+        entrance: form.state.delivery.entrance || undefined,
+        floor: form.state.delivery.floor || undefined,
+        additionalInfo: form.state.delivery.notes || undefined,
+      },
+      deliveryMethod: form.state.deliveryMethod!,
+      paymentMethod: form.state.paymentMethod!,
+      installmentMonths: form.state.installmentMonths,
+      promoCode: promoResult?.valid ? promoCode : null,
+      saveCardConsent: form.state.paymentMethod === "card" ? saveCardConsent : null,
+      savedPaymentMethodId: form.state.paymentMethod === "saved_card" ? savedPaymentMethodId : null,
+      googlePayToken: extras.googlePayToken ?? null,
+      applePayExternal: form.state.paymentMethod === "apple_pay",
+      loanMonth: extras.loanMonth ?? null,
+      loanDiscountCode: extras.loanDiscountCode ?? null,
+      items: items.map((line) => ({
+        productId: line.productId,
+        quantity: line.quantity,
+        selectedVariants: Object.entries(line.variants).map(([attributeSlug, optionSlug]) => ({
+          attributeSlug,
+          optionSlug,
+        })),
+      })),
+    });
+
     try {
       let googlePayToken: string | undefined;
-      let loanMonthSubmit = loanMonth;
-      let loanDiscountSubmit = loanDiscountCode;
       if (form.state.paymentMethod === "google_pay") {
         if (!capabilities?.googlePay) throw new Error("Google Pay ამჟამად მიუწვდომელია.");
         googlePayToken = await requestGooglePayToken(capabilities.googlePay, total.toFixed(2));
       }
-      if (
-        (form.state.paymentMethod === "bog_loan" || form.state.paymentMethod === "bnpl") &&
-        (!loanMonthSubmit || !loanDiscountSubmit)
-      ) {
+
+      if (form.state.paymentMethod === "bog_loan" || form.state.paymentMethod === "bnpl") {
         if (!capabilities?.bogClientId) throw new Error("განვადების კალკულატორი მიუწვდომელია.");
-        const selected = await openBogInstallmentCalculator({
+        const finished = await openBogInstallmentCalculator({
           clientId: capabilities.bogClientId,
           amount: total,
-          bnpl: form.state.paymentMethod === "bnpl" ? true : form.state.paymentMethod === "bog_loan" ? false : undefined,
+          bnpl: bogCalculatorBnplFlag(form.state.paymentMethod),
+          onRequest: async (selected) => {
+            setLoanMonth(selected.month);
+            setLoanDiscountCode(selected.discount_code);
+            const result = await createOrder(
+              orderPayload({ loanMonth: selected.month, loanDiscountCode: selected.discount_code }),
+            );
+            if (!result.ok) {
+              throw new Error(result.message);
+            }
+            if (!result.data.providerOrderId) {
+              throw new Error("განვადების შეკვეთა ვერ შეიქმნა.");
+            }
+            return {
+              providerOrderId: result.data.providerOrderId,
+              orderNumber: result.data.orderNumber,
+              redirectUrl: result.data.redirectUrl,
+            };
+          },
         });
-        loanMonthSubmit = selected.month;
-        loanDiscountSubmit = selected.discount_code;
-        setLoanMonth(selected.month);
-        setLoanDiscountCode(selected.discount_code);
+        rotateCheckoutIdempotencyKey();
+        setOrderPlaced(true);
+        setSubmitting(false);
+        const next =
+          finished.sdkRedirectUrl ||
+          `/checkout/payment/success?order=${encodeURIComponent(finished.orderNumber)}`;
+        window.location.assign(next);
+        return;
       }
 
-      const result = await createOrder({
-        checkoutIdempotencyKey: getCheckoutIdempotencyKey(),
-        customer: form.state.customer,
-        address: {
-          city: form.state.delivery.city,
-          street: form.state.delivery.address,
-          building: form.state.delivery.building || undefined,
-          apartment: form.state.delivery.apartment || undefined,
-          entrance: form.state.delivery.entrance || undefined,
-          floor: form.state.delivery.floor || undefined,
-          additionalInfo: form.state.delivery.notes || undefined,
-        },
-        deliveryMethod: form.state.deliveryMethod,
-        paymentMethod: form.state.paymentMethod,
-        installmentMonths: form.state.installmentMonths,
-        promoCode: promoResult?.valid ? promoCode : null,
-        saveCardConsent: form.state.paymentMethod === "card" ? saveCardConsent : null,
-        savedPaymentMethodId: form.state.paymentMethod === "saved_card" ? savedPaymentMethodId : null,
-        googlePayToken: googlePayToken ?? null,
-        applePayExternal: form.state.paymentMethod === "apple_pay",
-        loanMonth: loanMonthSubmit,
-        loanDiscountCode: loanDiscountSubmit,
-        items: items.map((line) => ({
-          productId: line.productId,
-          quantity: line.quantity,
-          selectedVariants: Object.entries(line.variants).map(([attributeSlug, optionSlug]) => ({
-            attributeSlug,
-            optionSlug,
-          })),
-        })),
-      });
+      const result = await createOrder(orderPayload({ googlePayToken: googlePayToken ?? null }));
       setSubmitting(false);
 
       if (!result.ok) {
@@ -257,9 +282,6 @@ export function CheckoutPageClient({
             <PaymentMethodSection
               value={form.state.paymentMethod}
               onChange={form.setPaymentMethod}
-              installmentMonths={form.state.installmentMonths}
-              onInstallmentMonthsChange={form.setInstallmentMonths}
-              total={total}
               error={form.getError("paymentMethod")}
               capabilities={capabilities}
               savedMethods={savedMethods}

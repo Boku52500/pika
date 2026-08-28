@@ -66,7 +66,9 @@ export function CheckoutOrderSummary({
       <p className="text-label text-center normal-case tracking-normal text-text-faint">
         {paymentMethod === "card"
           ? "შეკვეთის დადასტურების შემდეგ გადახვალთ საქართველოს ბანკის უსაფრთხო გადახდის გვერდზე."
-          : "ღილაკზე დაჭერით იქმნება შეკვეთა. ბარათის მონაცემები ამ გვერდზე არ გროვდება."}
+          : paymentMethod === "bnpl" || paymentMethod === "bog_loan"
+            ? "შეკვეთის დადასტურების შემდეგ გაიხსნება საქართველოს ბანკის კალკულატორი."
+            : "ღილაკზე დაჭერით იქმნება შეკვეთა. ბარათის მონაცემები ამ გვერდზე არ გროვდება."}
       </p>
     </div>
   );

@@ -30,8 +30,8 @@ export const PAYMENT_METHOD_LABEL = {
   cash_on_delivery: "გადახდა მიწოდებისას",
   google_pay: "Google Pay",
   apple_pay: "Apple Pay",
-  bog_loan: "საქართველოს ბანკის განვადება",
-  bnpl: "BNPL",
+  bog_loan: "განვადება",
+  bnpl: "ნაწილ-ნაწილ",
   saved_card: "შენახული ბარათი",
 } as const;
 

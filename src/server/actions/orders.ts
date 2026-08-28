@@ -128,6 +128,7 @@ async function continueCardPayment(
       data: {
         orderNumber,
         redirectUrl: started.redirectUrl,
+        providerOrderId: started.providerOrderId,
         applePay: started.applePay,
       },
     };
@@ -148,7 +149,7 @@ async function replayExistingCheckout(order: {
   orderNumber: string;
   paymentMethod: string;
   paymentStatus: string;
-}): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string; applePay?: { providerOrderId: string; result: unknown } }>> {
+}): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string; providerOrderId?: string; applePay?: { providerOrderId: string; result: unknown } }>> {
   await setConfirmCookie(order.orderNumber);
   if (isOnlineBogMethod(order.paymentMethod) && !isPaidLikePaymentStatus(order.paymentStatus)) {
     return continueCardPayment(order.id, order.orderNumber, { method: order.paymentMethod });
@@ -158,7 +159,7 @@ async function replayExistingCheckout(order: {
 
 export async function createOrder(
   input: unknown,
-): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string; applePay?: { providerOrderId: string; result: unknown } }>> {
+): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string; providerOrderId?: string; applePay?: { providerOrderId: string; result: unknown } }>> {
   const parsed = orderSubmissionSchema.safeParse(input);
   if (!parsed.success) {
     const { message, fieldErrors } = firstZodMessage(parsed.error);
@@ -189,10 +190,10 @@ export async function createOrder(
     return { ok: false, message: "Apple Pay ამჟამად მიუწვდომელია." };
   }
   if (payload.paymentMethod === "bog_loan" && !caps.installment) {
-    return { ok: false, message: "საქართველოს ბანკის განვადება ამჟამად მიუწვდომელია." };
+    return { ok: false, message: "განვადება ამჟამად მიუწვდომელია." };
   }
   if (payload.paymentMethod === "bnpl" && !caps.bnpl) {
-    return { ok: false, message: "განვადება ამჟამად მიუწვდომელია." };
+    return { ok: false, message: "ნაწილ-ნაწილ ამჟამად მიუწვდომელია." };
   }
   if (payload.paymentMethod === "saved_card" && (!caps.savedCardRecurrent || !session?.id || !payload.savedPaymentMethodId)) {
     return { ok: false, message: "შენახული ბარათით გადახდა მხოლოდ ავტორიზებული მომხმარებლისთვისაა." };

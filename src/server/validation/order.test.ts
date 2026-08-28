@@ -67,6 +67,7 @@ describe("orderSubmissionSchema cart size", () => {
     assert.equal(orderSubmissionSchema.safeParse(payload({ paymentMethod: "google_pay" })).success, true);
     assert.equal(orderSubmissionSchema.safeParse(payload({ paymentMethod: "apple_pay" })).success, true);
     assert.equal(orderSubmissionSchema.safeParse(payload({ paymentMethod: "bog_loan", loanMonth: 12, loanDiscountCode: "X" })).success, true);
+    assert.equal(orderSubmissionSchema.safeParse(payload({ paymentMethod: "bnpl", loanMonth: 4, loanDiscountCode: "BNPL" })).success, true);
     assert.equal(orderSubmissionSchema.safeParse(payload({ paymentMethod: "card", saveCardConsent: "recurrent" })).success, true);
     assert.equal(orderSubmissionSchema.safeParse(payload({ paymentMethod: "card", saveCardConsent: "subscription" })).success, false);
   });
