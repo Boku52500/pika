@@ -39,10 +39,36 @@ export function bogCalculatorCspSources(): {
 
 export function bogCalculatorUserMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
-  if (message === "closed") return "განვადების კალკულატორი დაიხურა.";
   if (message === "BOG calculator is unavailable" || message === "BOG SDK failed") {
     return "საქართველოს ბანკის კალკულატორი ვერ ჩაიტვირთა. სცადეთ თავიდან.";
   }
   if (error instanceof Error && error.message) return error.message;
   return "გადახდის დაწყება ვერ მოხერხდა.";
+}
+
+export function isBogCalculatorCancelled(error: unknown): boolean {
+  return error instanceof Error && error.message === "closed";
+}
+
+/**
+ * Official `onClose` is "customer closes the modal". The SDK also dismisses
+ * the calculator overlay after `successCb` and may dismiss it while merchant
+ * order creation is still in flight. Those must not be treated as failures.
+ */
+export function classifyCalculatorOnClose(state: {
+  requesting: boolean;
+  hasCreatedOrder: boolean;
+  settled: boolean;
+}): "ignore" | "wait" | "cancel" {
+  if (state.settled || state.hasCreatedOrder) return "ignore";
+  if (state.requesting) return "wait";
+  return "cancel";
+}
+
+/** TEMPORARY: callback names and booleans only. Never log secrets, tokens, or IDs. */
+export function logCalculatorDiag(
+  event: string,
+  data?: Record<string, boolean | number | string | undefined>,
+): void {
+  console.info("[pika-bog-calculator]", { event, ...data });
 }

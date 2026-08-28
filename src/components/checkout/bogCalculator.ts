@@ -1,7 +1,12 @@
 "use client";
 
 import { bogCalculatorBnplFlag } from "@/lib/checkout";
-import { bogCalculatorScriptId, bogCalculatorScriptUrl } from "@/lib/bogSdk";
+import {
+  bogCalculatorScriptId,
+  bogCalculatorScriptUrl,
+  classifyCalculatorOnClose,
+  logCalculatorDiag,
+} from "@/lib/bogSdk";
 
 type BogCalculatorSelected = { amount?: number; month?: number; discount_code?: string };
 type BogCalculatorApi = { open: (opts: Record<string, unknown>) => void };
@@ -111,48 +116,91 @@ export function openBogInstallmentCalculator(input: {
   /** Official SDK: true = ნაწილ-ნაწილ only; false = განვადება only. Never omit. */
   bnpl: boolean;
   onRequest: (selected: { month: number; discount_code: string }) => Promise<BogLoanOrderResult>;
-}): Promise<BogLoanOrderResult & { sdkRedirectUrl?: string }> {
+}): Promise<{ cancelled: true } | (BogLoanOrderResult & { sdkRedirectUrl?: string })> {
   return new Promise((resolve, reject) => {
     let settled = false;
+    let requesting = false;
     let created: BogLoanOrderResult | null = null;
 
     const fail = (error: Error) => {
       if (settled) return;
       settled = true;
+      logCalculatorDiag("session_failed", { bnpl: input.bnpl, message: error.message === "closed" ? "closed" : "error" });
       reject(error);
+    };
+
+    const cancel = () => {
+      if (settled) return;
+      settled = true;
+      logCalculatorDiag("session_cancelled", { bnpl: input.bnpl });
+      resolve({ cancelled: true });
     };
 
     void loadBogCalculatorSdk(input.clientId)
       .then((calculator) => {
         if (settled) return;
+        logCalculatorDiag("calculator_opened", { bnpl: input.bnpl });
         calculator.open({
           amount: input.amount,
           bnpl: input.bnpl,
           onClose: () => {
-            if (created || settled) return;
-            fail(new Error("closed"));
+            const kind = classifyCalculatorOnClose({
+              requesting,
+              hasCreatedOrder: Boolean(created),
+              settled,
+            });
+            logCalculatorDiag("onClose", {
+              bnpl: input.bnpl,
+              kind,
+              requesting,
+              hasCreatedOrder: Boolean(created),
+              settled,
+            });
+            if (kind === "cancel") cancel();
           },
           onRequest: (selected: BogCalculatorSelected, successCb: (orderId: string) => void, closeCb: () => void) => {
             const month = Number(selected.month);
             const discount_code = String(selected.discount_code ?? "");
+            logCalculatorDiag("onRequest", {
+              bnpl: input.bnpl,
+              hasMonth: Boolean(month),
+              hasDiscountCode: Boolean(discount_code),
+            });
             if (!month || !discount_code) {
+              logCalculatorDiag("onRequest_missing_terms", { bnpl: input.bnpl });
               closeCb();
               fail(new Error("missing terms"));
               return false;
             }
+            requesting = true;
+            logCalculatorDiag("pika_order_started", { bnpl: input.bnpl, hasMonth: true, hasDiscountCode: true });
             void input
               .onRequest({ month, discount_code })
               .then((result) => {
                 created = result;
+                requesting = false;
+                logCalculatorDiag("pika_order_succeeded", {
+                  bnpl: input.bnpl,
+                  hasProviderOrderId: Boolean(result.providerOrderId),
+                });
+                logCalculatorDiag("successCb", { bnpl: input.bnpl, hasProviderOrderId: true });
                 successCb(result.providerOrderId);
               })
               .catch((error: unknown) => {
+                requesting = false;
+                logCalculatorDiag("pika_order_failed", { bnpl: input.bnpl });
                 closeCb();
                 fail(error instanceof Error ? error : new Error("განვადების შეკვეთა ვერ შეიქმნა."));
               });
             return undefined;
           },
           onComplete: ({ redirectUrl }: { redirectUrl?: string }) => {
+            logCalculatorDiag("onComplete", {
+              bnpl: input.bnpl,
+              hasCreatedOrder: Boolean(created),
+              hasRedirectUrl: Boolean(redirectUrl),
+              settled,
+            });
             if (!created) {
               fail(new Error("missing BOG order"));
               return false;

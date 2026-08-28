@@ -5,7 +5,10 @@ import {
   bogCalculatorCspSources,
   bogCalculatorScriptUrl,
   bogCalculatorUserMessage,
+  classifyCalculatorOnClose,
+  isBogCalculatorCancelled,
 } from "./bogSdk";
+
 describe("bogCalculatorUserMessage", () => {
   it("does not show the internal SDK error until load has actually failed", () => {
     assert.equal(
@@ -15,6 +18,34 @@ describe("bogCalculatorUserMessage", () => {
     assert.equal(
       bogCalculatorUserMessage(new Error("BOG SDK failed")),
       "საქართველოს ბანკის კალკულატორი ვერ ჩაიტვირთა. სცადეთ თავიდან.",
+    );
+  });
+});
+
+describe("classifyCalculatorOnClose", () => {
+  it("treats a close before onRequest as user cancellation, not a payment error", () => {
+    assert.equal(
+      classifyCalculatorOnClose({ requesting: false, hasCreatedOrder: false, settled: false }),
+      "cancel",
+    );
+    assert.equal(isBogCalculatorCancelled(new Error("closed")), true);
+  });
+
+  it("waits when the SDK closes during onRequest instead of reporting calculator closed", () => {
+    assert.equal(
+      classifyCalculatorOnClose({ requesting: true, hasCreatedOrder: false, settled: false }),
+      "wait",
+    );
+  });
+
+  it("ignores close after successCb or settlement as an SDK transition", () => {
+    assert.equal(
+      classifyCalculatorOnClose({ requesting: false, hasCreatedOrder: true, settled: false }),
+      "ignore",
+    );
+    assert.equal(
+      classifyCalculatorOnClose({ requesting: false, hasCreatedOrder: false, settled: true }),
+      "ignore",
     );
   });
 });
