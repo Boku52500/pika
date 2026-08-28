@@ -21,6 +21,7 @@ import { isOnlineBogMethod } from "@/server/payments/methods";
 import { validateBogSplitPayments, parseSplitRecipientsEnv } from "@/server/payments/bog/split";
 import { resolveCaptureMode, resolveCreateOrderPaymentMethods } from "@/server/payments/bog/policy";
 import { resolveBogCreateOrderLoan } from "@/lib/bogSdk";
+import { overlayIncompatibleFinancingPlan } from "@/server/payments/financingReuse";
 
 export { PaymentUserError };
 
@@ -205,7 +206,11 @@ export async function startBogPaymentForOrder(
       );
     }
 
-    const plan = latestUsableRedirect(payments);
+    const plan = overlayIncompatibleFinancingPlan(
+      latestUsableRedirect(payments),
+      payments[0],
+      { method, loan: options.loan },
+    );
     if (plan?.kind === "paid") {
       throw new PaymentUserError("ეს შეკვეთა უკვე გადახდილია");
     }
@@ -234,6 +239,12 @@ export async function startBogPaymentForOrder(
     const idempotencyKey = plan?.kind === "retry-same" ? plan.idempotencyKey : randomUUID();
 
     if (!paymentId) {
+      if (order.paymentMethod !== method) {
+        await tx.order.update({
+          where: { id: order.id },
+          data: { paymentMethod: method as typeof order.paymentMethod },
+        });
+      }
       const created = await tx.payment.create({
         data: {
           orderId: order.id,
