@@ -20,7 +20,7 @@ export type StorefrontOrder = {
   createdAt: number;
   customerId: string | null;
   status: OrderStatus;
-  paymentStatus: "unpaid" | "pending" | "processing" | "paid" | "failed" | "refunded" | "partially_refunded";
+  paymentStatus: "unpaid" | "pending" | "processing" | "authorized" | "paid" | "failed" | "refunded" | "partially_refunded";
   items: StorefrontOrderItem[];
   subtotal: number;
   discount: number;
@@ -72,5 +72,14 @@ export function toUiOrderStatus(status: string): OrderStatus {
 export function toUiPaymentMethod(method: string): PaymentMethodId {
   if (method === "cash_on_delivery") return "cash-on-delivery";
   if (method === "installment") return "installment";
+  if (
+    method === "google_pay" ||
+    method === "apple_pay" ||
+    method === "bog_loan" ||
+    method === "bnpl" ||
+    method === "saved_card"
+  ) {
+    return method;
+  }
   return "card";
 }

@@ -5,6 +5,7 @@ import { prisma } from "@/server/db";
 import { logWarn } from "@/server/log";
 import { moneyToNumber, tetriToNumber } from "@/server/money";
 import { confirmedRefundedTetri } from "@/server/payments/refundable";
+import { isOnlineBogMethod } from "@/server/payments/methods";
 import { deliverEmail } from "@/server/email/deliver";
 import {
   orderEmailRecipient,
@@ -34,7 +35,7 @@ function orderCta(order: { orderNumber: string; customerId: string | null; payme
       label: "შეკვეთის ნახვა",
     };
   }
-  if (order.paymentMethod === "card") {
+  if (isOnlineBogMethod(order.paymentMethod)) {
     return {
       href: `${origin}/checkout/payment/success?order=${encodeURIComponent(order.orderNumber)}`,
       label: "შეკვეთის ნახვა",

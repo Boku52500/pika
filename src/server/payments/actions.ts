@@ -9,12 +9,19 @@ import { logError } from "@/server/log";
 import { GENERIC_SERVER_ERROR, type ActionResult } from "@/server/actions/result";
 import { revalidateOrders } from "@/server/admin/revalidate";
 import { bogConfigured, BOG_NOT_CONFIGURED_MESSAGE } from "@/server/payments/bog/config";
-import { getBogPaymentDetails } from "@/server/payments/bog/client";
+import { acceptBogApplePayPayment, getBogPaymentDetails } from "@/server/payments/bog/client";
 import { PaymentUserError, startBogPaymentForOrder } from "@/server/payments/initiate";
 import { customerCanAccessOrder } from "@/server/payments/access";
 import { reconcileBogPaymentDetails } from "@/server/payments/reconcile";
 import { parseAdminRefundInput } from "@/server/payments/refundable";
 import { requestAdminBogRefund } from "@/server/payments/refund";
+import { captureAuthorizedPayment, rejectAuthorizedPayment } from "@/server/payments/bog/preauth";
+import { recordProviderAction } from "@/server/payments/audit";
+import { getBogMerchantCapabilities } from "@/server/payments/bog/capabilities";
+import { isPaidAttemptStatus } from "@/server/payments/bog/status";
+import { hasInFlightProviderAction } from "@/server/payments/bog/policy";
+import { bogCustomerSuccessUrl } from "@/server/payments/urls";
+import { randomUUID } from "node:crypto";
 
 export async function retryOrderPayment(
   input: unknown,
@@ -41,7 +48,13 @@ export async function retryOrderPayment(
   }
 
   try {
-    const { redirectUrl } = await startBogPaymentForOrder(order.id);
+    const started = await startBogPaymentForOrder(order.id, { method: order.paymentMethod });
+    const redirectUrl =
+      started.redirectUrl ??
+      (started.awaitingProvider || started.applePay ? bogCustomerSuccessUrl(order.orderNumber) : null);
+    if (!redirectUrl) {
+      return { ok: false, message: GENERIC_SERVER_ERROR, orderNumber: order.orderNumber };
+    }
     return { ok: true, data: { orderNumber: order.orderNumber, redirectUrl } };
   } catch (error) {
     if (error instanceof PaymentUserError) {
@@ -101,4 +114,88 @@ export async function refundAdminOrderPayment(input: unknown): Promise<ActionRes
     adminNote: parsed.adminNote,
     adminId: gate.admin.id,
   });
+}
+
+export async function captureAdminPreauthorization(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const record = input && typeof input === "object" ? (input as { paymentId?: unknown; amount?: unknown; description?: unknown }) : {};
+  const paymentId = typeof record.paymentId === "string" ? record.paymentId.trim() : "";
+  if (!paymentId) return { ok: false, message: "გადახდა ვერ მოიძებნა" };
+  return captureAuthorizedPayment({
+    paymentId,
+    amountRaw: typeof record.amount === "string" ? record.amount : undefined,
+    description: typeof record.description === "string" ? record.description : undefined,
+    adminId: gate.admin.id,
+  });
+}
+
+export async function rejectAdminPreauthorization(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const record = input && typeof input === "object" ? (input as { paymentId?: unknown; description?: unknown }) : {};
+  const paymentId = typeof record.paymentId === "string" ? record.paymentId.trim() : "";
+  if (!paymentId) return { ok: false, message: "გადახდა ვერ მოიძებნა" };
+  return rejectAuthorizedPayment({
+    paymentId,
+    description: typeof record.description === "string" ? record.description : undefined,
+    adminId: gate.admin.id,
+  });
+}
+
+export async function acceptApplePayPayment(input: unknown): Promise<ActionResult> {
+  const session = await getSessionCustomer();
+  const record = input && typeof input === "object" ? (input as { providerOrderId?: unknown; applePayToken?: unknown }) : {};
+  const providerOrderId = typeof record.providerOrderId === "string" ? record.providerOrderId.trim() : "";
+  const applePayToken = typeof record.applePayToken === "string" ? record.applePayToken : "";
+  if (!providerOrderId || !applePayToken) return { ok: false, message: "Apple Pay ვერ დასრულდა." };
+  const caps = getBogMerchantCapabilities();
+  if (!caps.externalApplePay) return { ok: false, message: "Apple Pay ამჟამად მიუწვდომელია." };
+
+  const payment = await prisma.payment.findFirst({
+    where: { provider: "bog", providerOrderId },
+    include: {
+      order: { select: { id: true, orderNumber: true, customerId: true } },
+      providerActions: { where: { type: "apple_pay_accept" } },
+    },
+  });
+  if (!payment) return { ok: false, message: "გადახდა ვერ მოიძებნა" };
+  if (!(await customerCanAccessOrder(payment.order, session?.id ?? null))) {
+    return { ok: false, message: "გადახდა ვერ მოიძებნა" };
+  }
+  if (isPaidAttemptStatus(payment.status) || payment.status === "authorized") {
+    return { ok: true };
+  }
+  if (hasInFlightProviderAction(payment.providerActions, ["apple_pay_accept"])) {
+    const details = await getBogPaymentDetails(providerOrderId);
+    await reconcileBogPaymentDetails(details);
+    return { ok: true };
+  }
+
+  const ip = clientIpFromHeaders(await headers());
+  if (!(await consumeRateLimit(`apple-pay:ip:${ip}`, 10, 15 * 60 * 1000))) {
+    return { ok: false, message: "ძალიან ბევრი მცდელობაა. სცადეთ მოგვიანებით." };
+  }
+
+  const idempotencyKey = randomUUID();
+  try {
+    await recordProviderAction({
+      type: "apple_pay_accept",
+      status: "requested",
+      paymentId: payment.id,
+      orderId: payment.orderId,
+      idempotencyKey,
+    });
+    await acceptBogApplePayPayment({
+      providerOrderId,
+      idempotencyKey,
+      applePayToken,
+    });
+    const details = await getBogPaymentDetails(providerOrderId);
+    await reconcileBogPaymentDetails(details);
+    return { ok: true };
+  } catch (error) {
+    logError("bog.apple_pay_accept_failed", { error, paymentId: payment.id });
+    return { ok: false, message: GENERIC_SERVER_ERROR };
+  }
 }

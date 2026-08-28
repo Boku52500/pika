@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Package, Heart, MapPin, User, LogOut } from "lucide-react";
+import { LayoutGrid, Package, Heart, MapPin, User, LogOut, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -11,6 +11,7 @@ const sections = [
   { href: "/account/orders", label: "შეკვეთები", icon: Package },
   { href: "/account/wishlist", label: "რჩეულები", icon: Heart },
   { href: "/account/addresses", label: "მისამართები", icon: MapPin },
+  { href: "/account/payment-methods", label: "გადახდის მეთოდები", icon: CreditCard },
   { href: "/account/profile", label: "პროფილი", icon: User },
 ];
 

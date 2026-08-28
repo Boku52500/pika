@@ -16,3 +16,10 @@ export class BogNotConfiguredError extends Error {
     this.name = "BogNotConfiguredError";
   }
 }
+
+export class PaymentUserError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PaymentUserError";
+  }
+}

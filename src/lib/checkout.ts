@@ -85,7 +85,15 @@ export function getDeliveryMethodFee(method: DeliveryMethodOption, payableSubtot
   return method.price;
 }
 
-export type PaymentMethodId = "card" | "installment" | "cash-on-delivery";
+export type PaymentMethodId =
+  | "card"
+  | "installment"
+  | "cash-on-delivery"
+  | "google_pay"
+  | "apple_pay"
+  | "bog_loan"
+  | "bnpl"
+  | "saved_card";
 
 export interface PaymentMethodOption {
   id: PaymentMethodId;
@@ -98,6 +106,30 @@ export const paymentMethods: PaymentMethodOption[] = [
   { id: "installment", label: "განვადება", description: "გადაანაწილეთ თანხა თვეებში ბანკის მეშვეობით" },
   { id: "cash-on-delivery", label: "კურიერთან გადახდა", description: "გადაიხადეთ მიღებისას — ნაღდი ან ბარათით" },
 ];
+
+export type PublicCheckoutCapabilities = {
+  card: boolean;
+  hostedGooglePay: boolean;
+  externalGooglePay: boolean;
+  externalApplePay: boolean;
+  bogLoan: boolean;
+  bnpl: boolean;
+  savedCard: boolean;
+  saveCardRecurrent: boolean;
+  googlePay: {
+    environment: "TEST" | "PRODUCTION";
+    gateway: string;
+    gatewayMerchantId: string;
+  } | null;
+  bogClientId: string | null;
+};
+
+export type SavedCheckoutCard = {
+  id: string;
+  maskedPan: string | null;
+  cardType: string | null;
+  cardExpiry: string | null;
+};
 
 export interface InstallmentProvider {
   id: string;

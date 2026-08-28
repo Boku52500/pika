@@ -23,13 +23,14 @@ export function isBogProviderStatus(value: string): value is BogProviderStatus {
 export function mapBogStatusToAttempt(providerStatus: string): PaymentAttemptStatus {
   switch (providerStatus) {
     case "completed":
+    case "partial_completed":
       return "paid";
     case "rejected":
       return "failed";
+    case "blocked":
+      return "authorized";
     case "processing":
     case "auth_requested":
-    case "blocked":
-    case "partial_completed":
     case "refund_requested":
       return "processing";
     case "refunded":
@@ -46,15 +47,17 @@ export function deriveOrderPaymentStatus(attempts: Array<{ status: PaymentAttemp
   if (attempts.some((row) => row.status === "refunded")) return "refunded";
   if (attempts.some((row) => row.status === "partially_refunded")) return "partially_refunded";
   if (attempts.some((row) => row.status === "paid")) return "paid";
+  if (attempts.some((row) => row.status === "authorized")) return "authorized";
   const latest = attempts[attempts.length - 1];
   if (!latest) return "unpaid";
   if (latest.status === "processing") return "processing";
-  if (latest.status === "failed") return "failed";
+  if (latest.status === "failed" || latest.status === "voided") return "failed";
   if (latest.status === "pending") return "pending";
   return "pending";
 }
 
 const TERMINAL_PAID: PaymentAttemptStatus[] = ["paid", "refunded", "partially_refunded"];
+const TERMINAL_CLOSED: PaymentAttemptStatus[] = [...TERMINAL_PAID, "voided"];
 
 /** Whether incoming provider status should overwrite the stored attempt. */
 export function shouldApplyAttemptStatus(
@@ -63,15 +66,28 @@ export function shouldApplyAttemptStatus(
 ): boolean {
   if (current === incoming) return true;
   if (TERMINAL_PAID.includes(current) && incoming === "failed") return false;
-  if (TERMINAL_PAID.includes(current) && (incoming === "pending" || incoming === "processing")) return false;
+  if (TERMINAL_PAID.includes(current) && (incoming === "pending" || incoming === "processing" || incoming === "authorized")) {
+    return false;
+  }
+  if (current === "voided" && incoming !== "voided") return false;
   if (current === "refunded" && incoming !== "refunded") return false;
   return true;
 }
 
 export function isRetryableAttemptStatus(status: PaymentAttemptStatus): boolean {
-  return status === "failed" || status === "pending" || status === "processing";
+  return status === "failed" || status === "pending" || status === "processing" || status === "voided";
 }
 
 export function isPaidAttemptStatus(status: PaymentAttemptStatus): boolean {
   return status === "paid" || status === "refunded" || status === "partially_refunded";
 }
+
+export function isAuthorizedAttemptStatus(status: PaymentAttemptStatus): boolean {
+  return status === "authorized";
+}
+
+export function isVoidedAttemptStatus(status: PaymentAttemptStatus): boolean {
+  return status === "voided";
+}
+
+export { TERMINAL_CLOSED };

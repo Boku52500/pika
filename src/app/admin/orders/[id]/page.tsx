@@ -15,6 +15,7 @@ import { ProductImage } from "@/components/product/ProductImage";
 import { OrderStatusForm } from "@/components/admin/OrderStatusForm";
 import { PaymentRefreshForm } from "@/components/admin/PaymentRefreshForm";
 import { PaymentRefundForm } from "@/components/admin/PaymentRefundForm";
+import { PaymentCaptureForm } from "@/components/admin/PaymentCaptureForm";
 import { AdminEmailHistory } from "@/components/admin/AdminEmailHistory";
 import { PAYMENT_STATUS_COPY } from "@/lib/paymentCopy";
 import { PAYMENT_REFUND_STATUS_LABEL } from "@/lib/adminLabels";
@@ -131,6 +132,46 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                       <dd className="tnum">{payment.authCode}</dd>
                     </div>
                   ) : null}
+                  {payment.captureMode ? (
+                    <div>
+                      <dt className="text-label text-text-faint">Capture mode</dt>
+                      <dd>{payment.captureMode}</dd>
+                    </div>
+                  ) : null}
+                  {payment.authorizedAmount != null ? (
+                    <div className="flex justify-between gap-3">
+                      <dt>ავტორიზებული თანხა</dt>
+                      <dd className="tnum font-medium text-text">{formatPrice(payment.authorizedAmount)}</dd>
+                    </div>
+                  ) : null}
+                  {payment.capturedAmount != null ? (
+                    <div className="flex justify-between gap-3">
+                      <dt>ჩამოჭრილი თანხა</dt>
+                      <dd className="tnum font-medium text-text">{formatPrice(payment.capturedAmount)}</dd>
+                    </div>
+                  ) : null}
+                  {payment.splitStatus ? (
+                    <div>
+                      <dt className="text-label text-text-faint">Split status</dt>
+                      <dd>
+                        {payment.splitStatus}. დაბრუნება უკვე შესრულებულ split-ს ავტომატურად არ აბრუნებს.
+                      </dd>
+                    </div>
+                  ) : null}
+                  {payment.parentProviderOrderId ? (
+                    <div>
+                      <dt className="text-label text-text-faint">Saved card parent</dt>
+                      <dd className="tnum break-all">{payment.parentProviderOrderId}</dd>
+                    </div>
+                  ) : null}
+                  {payment.loanMonth ? (
+                    <div>
+                      <dt className="text-label text-text-faint">განვადება</dt>
+                      <dd>
+                        {payment.loanMonth} თვე{payment.loanDiscountCode ? ` · ${payment.loanDiscountCode}` : ""}
+                      </dd>
+                    </div>
+                  ) : null}
                   {payment.responseCode ? (
                     <div>
                       <dt className="text-label text-text-faint">Response</dt>
@@ -151,6 +192,23 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                     </div>
                   ) : null}
                 </dl>
+                {payment.canCapture ? (
+                  <PaymentCaptureForm paymentId={payment.id} authorizedAmount={payment.authorizedAmount} />
+                ) : null}
+                {payment.providerActions?.length ? (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <p className="text-label mb-2 font-medium text-text">პროვაიდერის ქმედებები</p>
+                    <ul className="flex flex-col gap-1 text-label text-text-muted">
+                      {payment.providerActions.map((action) => (
+                        <li key={action.id}>
+                          {action.type} · {action.status}
+                          {action.normalizedStatus ? ` · ${action.normalizedStatus}` : ""}
+                          {action.providerActionId ? ` · ${action.providerActionId}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
                 {payment.refunds.length > 0 ? (
                   <div className="mt-3 border-t border-border pt-3">
                     <p className="text-label mb-2 font-medium text-text">დაბრუნების ისტორია</p>

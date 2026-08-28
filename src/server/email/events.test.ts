@@ -95,5 +95,7 @@ describe("email failure vs business state", () => {
   it("a provider failure result is not a success and does not imply rolling back PAID", () => {
     assert.equal(planPaymentEmails("processing", "paid"), "payment_paid");
     assert.equal(planPaymentEmails("paid", "paid"), null);
+    assert.equal(planPaymentEmails("pending", "authorized"), null);
+    assert.equal(planPaymentEmails("authorized", "paid"), "payment_paid");
   });
 });

@@ -1,7 +1,8 @@
 import { Prisma, type PaymentAttemptStatus } from "@/generated/prisma/client";
-import { amountsMatch, parseBogAmount } from "@/server/payments/bog/payload";
+import { amountLessOrEqual, amountsMatch, parseBogAmount } from "@/server/payments/bog/payload";
 import { mapBogStatusToAttempt } from "@/server/payments/bog/status";
 import type { BogPaymentDetails } from "@/server/payments/bog/schemas";
+import { moneyToTetri } from "@/server/money";
 
 export type LocalPaymentMatch = {
   providerOrderId: string | null;
@@ -30,8 +31,16 @@ export function matchBogDetailsToLocal(
   if (requested && !amountsMatch(payment.amount, requested)) {
     return { ok: false, reason: "amount_mismatch" };
   }
-  if (incomingStatus === "paid" && transferred && !amountsMatch(payment.amount, transferred)) {
-    return { ok: false, reason: "transfer_amount_mismatch" };
+  if (incomingStatus === "paid" && transferred) {
+    if (moneyToTetri(transferred) <= 0) {
+      return { ok: false, reason: "transfer_amount_mismatch" };
+    }
+    if (!amountLessOrEqual(transferred, payment.amount)) {
+      return { ok: false, reason: "transfer_amount_mismatch" };
+    }
+    if (details.order_status.key !== "partial_completed" && !amountsMatch(payment.amount, transferred)) {
+      return { ok: false, reason: "transfer_amount_mismatch" };
+    }
   }
   return { ok: true };
 }

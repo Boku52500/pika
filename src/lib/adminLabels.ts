@@ -17,6 +17,7 @@ export const PAYMENT_STATUS_LABEL = {
   unpaid: "გადაუხდელი",
   pending: "მოლოდინში",
   processing: "მუშავდება",
+  authorized: "ავტორიზებული",
   paid: "გადახდილი",
   failed: "წარუმატებელი",
   refunded: "დაბრუნებული",
@@ -27,6 +28,11 @@ export const PAYMENT_METHOD_LABEL = {
   card: "ბარათი",
   installment: "განვადება",
   cash_on_delivery: "გადახდა მიწოდებისას",
+  google_pay: "Google Pay",
+  apple_pay: "Apple Pay",
+  bog_loan: "საქართველოს ბანკის განვადება",
+  bnpl: "BNPL",
+  saved_card: "შენახული ბარათი",
 } as const;
 
 export const PAYMENT_REFUND_STATUS_LABEL = {

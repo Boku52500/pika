@@ -6,12 +6,14 @@ import { BogApiError } from "@/server/payments/bog/errors";
 const DEFAULT_TIMEOUT_MS = 20_000;
 
 type BogHttpInit = {
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "PUT" | "DELETE";
   url: string;
   headers?: Record<string, string>;
   body?: string;
   timeoutMs?: number;
   event: string;
+  /** HTTP 202 with an empty body is success for saved-card enroll/delete. */
+  acceptEmpty?: boolean;
 };
 
 export async function bogFetchJson(init: BogHttpInit): Promise<unknown> {
@@ -47,6 +49,10 @@ export async function bogFetchJson(init: BogHttpInit): Promise<unknown> {
   if (!response.ok) {
     logWarn(init.event, { status: response.status, urlHost: safeHost(init.url) });
     throw new BogApiError("BOG request was rejected", response.status, errorCodeFromBody(parsed));
+  }
+
+  if (parsed == null && init.acceptEmpty) {
+    return { accepted: true, httpStatus: response.status };
   }
 
   return parsed;

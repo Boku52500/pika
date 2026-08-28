@@ -4,11 +4,13 @@ export const PAYMENT_STATUS_COPY: Record<
   | "unpaid"
   | "pending"
   | "processing"
+  | "authorized"
   | "paid"
   | "failed"
   | "refunded"
   | "partially_refunded"
-  | "refund_processing",
+  | "refund_processing"
+  | "voided",
   { label: string; title: string; body: string }
 > = {
   unpaid: {
@@ -25,6 +27,11 @@ export const PAYMENT_STATUS_COPY: Record<
     label: "გადახდა მუშავდება",
     title: "გადახდა მუშავდება",
     body: "ბანკი ამუშავებს გადახდას. გთხოვთ, დაელოდოთ — თანხის ჩამოჭრა ჯერ დადასტურებული არ არის.",
+  },
+  authorized: {
+    label: "თანხა დაბლოკილია",
+    title: "თანხა დაბლოკილია",
+    body: "თანხა დროებით დაბლოკილია ბარათზე. ჩამოჭრა დასრულდება მხოლოდ დადასტურების შემდეგ — ეს გვერდი არ ნიშნავს, რომ შეკვეთა უკვე გადახდილია.",
   },
   paid: {
     label: "გადახდილია",
@@ -50,6 +57,11 @@ export const PAYMENT_STATUS_COPY: Record<
     label: "თანხის დაბრუნება მუშავდება",
     title: "თანხის დაბრუნება მუშავდება",
     body: "ბანკი ამუშავებს თანხის დაბრუნებას. ეს ჯერ არ ნიშნავს, რომ თანხა უკვე დაბრუნებულია.",
+  },
+  voided: {
+    label: "ავტორიზაცია გაუქმებულია",
+    title: "ავტორიზაცია გაუქმებულია",
+    body: "დაბლოკილი თანხა გაითავისუფლდა. შეგიძლიათ ხელახლა სცადოთ გადახდა.",
   },
 };
 

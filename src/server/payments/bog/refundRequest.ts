@@ -1,5 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { moneyToNumber } from "@/server/money";
+import { bogRefundUrl } from "@/server/payments/bog/endpoints";
 
 /** Full refund omits `amount`. Partial refund sends documented `amount`. */
 export function buildBogRefundBody(
@@ -17,7 +18,7 @@ export function buildBogRefundRequest(input: {
 }): { url: string; headers: Record<string, string>; body: string } {
   const base = input.apiBaseUrl.replace(/\/+$/, "");
   return {
-    url: `${base}/payments/v1/payment/refund/${encodeURIComponent(input.providerOrderId)}`,
+    url: bogRefundUrl(base, input.providerOrderId),
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",

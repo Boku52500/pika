@@ -39,6 +39,7 @@ enum PaymentStatus {
   unpaid
   pending
   processing
+  authorized
   paid
   failed
   refunded
@@ -52,8 +53,10 @@ enum PaymentProvider {
 enum PaymentAttemptStatus {
   pending
   processing
+  authorized
   paid
   failed
+  voided
   refunded
   partially_refunded
 }
@@ -102,6 +105,35 @@ enum PaymentMethod {
   card
   installment
   cash_on_delivery
+  google_pay
+  apple_pay
+  bog_loan
+  bnpl
+  saved_card
+}
+
+enum SavedCardConsent {
+  recurrent
+  subscription
+}
+
+enum ProviderActionType {
+  save_card_recurrent
+  save_card_subscription
+  delete_saved_card
+  automatic_charge
+  capture
+  reject_authorization
+  refund
+  split
+  apple_pay_accept
+}
+
+enum ProviderActionStatus {
+  requested
+  accepted
+  completed
+  failed
 }
 
 enum DiscountType {
@@ -544,6 +576,8 @@ model Customer {
   passwordResetTokens PasswordResetToken[]
   paymentRefunds      PaymentRefund[]
   emailDeliveries     EmailDelivery[]
+  savedPaymentMethods SavedPaymentMethod[]
+  providerActions     ProviderAction[]
 
   @@index([email])
   @@index([phone])
@@ -637,6 +671,7 @@ model Order {
   payments          Payment[]
   emailDeliveries   EmailDelivery[]
   promoRedemption   PromotionRedemption?
+  providerActions   ProviderAction[]
 
   @@index([customerId, createdAt])
   @@index([orderStatus])
@@ -689,18 +724,108 @@ model Payment {
   lastError            String?
   /// Cumulative refunded amount from BOG Payment Details `purchase_units.refund_amount`.
   providerRefundAmount Decimal?              @db.Decimal(12, 2)
+  /// BOG `capture` on the ecommerce order: `automatic` or `manual`.
+  captureMode          String                @default("automatic")
+  authorizedAmount     Decimal?              @db.Decimal(12, 2)
+  capturedAmount       Decimal?              @db.Decimal(12, 2)
+  parentProviderOrderId String?
+  savedPaymentMethodId String?
+  paymentOption        String?
+  savedCardType        String?
+  loanMonth            Int?
+  loanDiscountCode     String?
+  splitStatus          String?
+  splitSnapshot        Json?
+  /// Non-secret provider session payload (e.g. Apple Pay `result`). Never a wallet token.
+  providerSession      Json?
+  /// Masked payer identifier from BOG (`548888xxxxxx9893`). Never a full PAN.
+  payerIdentifier      String?
+  cardExpiryDate       String?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   completedAt          DateTime?
 
-  order           Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  refunds         PaymentRefund[]
-  emailDeliveries EmailDelivery[]
+  order                Order                @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  refunds              PaymentRefund[]
+  emailDeliveries      EmailDelivery[]
+  savedPaymentMethod   SavedPaymentMethod?  @relation("SavedCardCharges", fields: [savedPaymentMethodId], references: [id], onDelete: SetNull)
+  enrolledSavedMethods SavedPaymentMethod[] @relation("SavedCardEnrollment")
+  providerActions      ProviderAction[]
 
   @@unique([provider, providerOrderId])
   @@index([orderId, createdAt])
   @@index([providerOrderId])
   @@index([status])
+  @@index([savedPaymentMethodId])
+  @@index([parentProviderOrderId])
+}
+
+/// Safe BOG saved-card reference. Never stores PAN, CVV, or wallet tokens.
+model SavedPaymentMethod {
+  id                    String           @id @default(cuid())
+  customerId            String
+  provider              PaymentProvider  @default(bog)
+  consent               SavedCardConsent
+  parentOrderId         String
+  maskedPan             String?
+  cardType              String?
+  cardExpiry            String?
+  enrollmentPaymentId   String?
+  deletedAt             DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  customer          Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  enrollmentPayment Payment? @relation("SavedCardEnrollment", fields: [enrollmentPaymentId], references: [id], onDelete: SetNull)
+  payments          Payment[] @relation("SavedCardCharges")
+  providerActions   ProviderAction[]
+
+  @@unique([provider, parentOrderId])
+  @@index([customerId, deletedAt])
+}
+
+/// Safe audit row for BOG provider actions. No wallet/card secrets.
+model ProviderAction {
+  id                   String               @id @default(cuid())
+  type                 ProviderActionType
+  status               ProviderActionStatus @default(requested)
+  orderId              String?
+  paymentId            String?
+  savedPaymentMethodId String?
+  customerId           String?
+  providerActionId     String?
+  idempotencyKey       String               @unique
+  amount               Decimal?             @db.Decimal(12, 2)
+  normalizedStatus     String?
+  errorCategory        String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  completedAt          DateTime?
+
+  order              Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  payment            Payment?            @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  savedPaymentMethod SavedPaymentMethod? @relation(fields: [savedPaymentMethodId], references: [id], onDelete: SetNull)
+  customer           Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([paymentId, createdAt])
+  @@index([orderId, createdAt])
+  @@index([type, createdAt])
+  @@index([providerActionId])
+}
+
+/// Admin/system-controlled split destinations. Customers never submit IBANs.
+model BogSplitRecipient {
+  id          String   @id @default(cuid())
+  iban        String
+  amount      Decimal? @db.Decimal(12, 2)
+  percent     Int?
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
 }
 
 /// One BOG refund request against a Payment. Partial refunds create multiple rows.

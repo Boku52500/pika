@@ -22,6 +22,11 @@ import { DeliveryMethodSection } from "./DeliveryMethodSection";
 import { PaymentMethodSection } from "./PaymentMethodSection";
 import { CheckoutOrderSummary } from "./CheckoutOrderSummary";
 import { CheckoutStickyMobileBar } from "./CheckoutStickyMobileBar";
+import { requestGooglePayToken } from "./googlePay";
+import { completeApplePaySheet } from "./applePay";
+import { openBogInstallmentCalculator } from "./bogCalculator";
+import { acceptApplePayPayment } from "@/server/payments/actions";
+import type { PublicCheckoutCapabilities, SavedCheckoutCard } from "@/lib/checkout";
 
 /**
  * Orchestrates `/checkout`: live cart + promo, form state, and a server
@@ -29,7 +34,13 @@ import { CheckoutStickyMobileBar } from "./CheckoutStickyMobileBar";
  * PostgreSQL confirms the order. Card checkout redirects to Bank of Georgia
  * and clears the cart only after payment is confirmed.
  */
-export function CheckoutPageClient() {
+export function CheckoutPageClient({
+  capabilities = null,
+  savedMethods = [],
+}: {
+  capabilities?: PublicCheckoutCapabilities | null;
+  savedMethods?: SavedCheckoutCard[];
+}) {
   const router = useRouter();
   const { items, subtotal, clear } = useCart();
   const { code: promoCode, result: promoResult, removeCode: removePromoCode } = usePromoCode(subtotal);
@@ -40,6 +51,10 @@ export function CheckoutPageClient() {
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [saveCardConsent, setSaveCardConsent] = useState<"recurrent" | null>(null);
+  const [savedPaymentMethodId, setSavedPaymentMethodId] = useState<string | null>(savedMethods[0]?.id ?? null);
+  const [loanMonth, setLoanMonth] = useState<number | null>(null);
+  const [loanDiscountCode, setLoanDiscountCode] = useState<string | null>(null);
   const prefilledRef = useRef(false);
 
   // Prefill from the logged-in customer's profile/default address exactly
@@ -91,55 +106,111 @@ export function CheckoutPageClient() {
 
     setSubmitting(true);
     setSubmitError(null);
-    const result = await createOrder({
-      checkoutIdempotencyKey: getCheckoutIdempotencyKey(),
-      customer: form.state.customer,
-      address: {
-        city: form.state.delivery.city,
-        street: form.state.delivery.address,
-        building: form.state.delivery.building || undefined,
-        apartment: form.state.delivery.apartment || undefined,
-        entrance: form.state.delivery.entrance || undefined,
-        floor: form.state.delivery.floor || undefined,
-        additionalInfo: form.state.delivery.notes || undefined,
-      },
-      deliveryMethod: form.state.deliveryMethod,
-      paymentMethod: form.state.paymentMethod,
-      installmentMonths: form.state.installmentMonths,
-      promoCode: promoResult?.valid ? promoCode : null,
-      items: items.map((line) => ({
-        productId: line.productId,
-        quantity: line.quantity,
-        selectedVariants: Object.entries(line.variants).map(([attributeSlug, optionSlug]) => ({
-          attributeSlug,
-          optionSlug,
-        })),
-      })),
-    });
-    setSubmitting(false);
-
-    if (!result.ok) {
-      setSubmitError(result.message);
-      if (result.orderNumber) {
-        rotateCheckoutIdempotencyKey();
-        setOrderPlaced(true);
-        router.push(`/checkout/payment/fail?order=${encodeURIComponent(result.orderNumber)}`);
+    try {
+      let googlePayToken: string | undefined;
+      let loanMonthSubmit = loanMonth;
+      let loanDiscountSubmit = loanDiscountCode;
+      if (form.state.paymentMethod === "google_pay") {
+        if (!capabilities?.googlePay) throw new Error("Google Pay ამჟამად მიუწვდომელია.");
+        googlePayToken = await requestGooglePayToken(capabilities.googlePay, total.toFixed(2));
       }
-      return;
-    }
+      if (
+        (form.state.paymentMethod === "bog_loan" || form.state.paymentMethod === "bnpl") &&
+        (!loanMonthSubmit || !loanDiscountSubmit)
+      ) {
+        if (!capabilities?.bogClientId) throw new Error("განვადების კალკულატორი მიუწვდომელია.");
+        const selected = await openBogInstallmentCalculator({
+          clientId: capabilities.bogClientId,
+          amount: total,
+          bnpl: form.state.paymentMethod === "bnpl" ? true : form.state.paymentMethod === "bog_loan" ? false : undefined,
+        });
+        loanMonthSubmit = selected.month;
+        loanDiscountSubmit = selected.discount_code;
+        setLoanMonth(selected.month);
+        setLoanDiscountCode(selected.discount_code);
+      }
 
-    rotateCheckoutIdempotencyKey();
+      const result = await createOrder({
+        checkoutIdempotencyKey: getCheckoutIdempotencyKey(),
+        customer: form.state.customer,
+        address: {
+          city: form.state.delivery.city,
+          street: form.state.delivery.address,
+          building: form.state.delivery.building || undefined,
+          apartment: form.state.delivery.apartment || undefined,
+          entrance: form.state.delivery.entrance || undefined,
+          floor: form.state.delivery.floor || undefined,
+          additionalInfo: form.state.delivery.notes || undefined,
+        },
+        deliveryMethod: form.state.deliveryMethod,
+        paymentMethod: form.state.paymentMethod,
+        installmentMonths: form.state.installmentMonths,
+        promoCode: promoResult?.valid ? promoCode : null,
+        saveCardConsent: form.state.paymentMethod === "card" ? saveCardConsent : null,
+        savedPaymentMethodId: form.state.paymentMethod === "saved_card" ? savedPaymentMethodId : null,
+        googlePayToken: googlePayToken ?? null,
+        applePayExternal: form.state.paymentMethod === "apple_pay",
+        loanMonth: loanMonthSubmit,
+        loanDiscountCode: loanDiscountSubmit,
+        items: items.map((line) => ({
+          productId: line.productId,
+          quantity: line.quantity,
+          selectedVariants: Object.entries(line.variants).map(([attributeSlug, optionSlug]) => ({
+            attributeSlug,
+            optionSlug,
+          })),
+        })),
+      });
+      setSubmitting(false);
 
-    if (result.data.redirectUrl) {
+      if (!result.ok) {
+        setSubmitError(result.message);
+        if (result.orderNumber) {
+          rotateCheckoutIdempotencyKey();
+          setOrderPlaced(true);
+          router.push(`/checkout/payment/fail?order=${encodeURIComponent(result.orderNumber)}`);
+        }
+        return;
+      }
+
+      rotateCheckoutIdempotencyKey();
+
+      if (result.data.applePay) {
+        setSubmitting(true);
+        await completeApplePaySheet({
+          result: result.data.applePay.result,
+          onToken: async (token) => {
+            const accepted = await acceptApplePayPayment({
+              providerOrderId: result.data.applePay?.providerOrderId,
+              applePayToken: token,
+            });
+            if (!accepted.ok) throw new Error(accepted.message);
+          },
+        });
+        setSubmitting(false);
+        setOrderPlaced(true);
+        router.push(`/checkout/payment/success?order=${encodeURIComponent(result.data.orderNumber)}`);
+        return;
+      }
+
+      if (result.data.redirectUrl) {
+        setOrderPlaced(true);
+        window.location.assign(result.data.redirectUrl);
+        return;
+      }
+
       setOrderPlaced(true);
-      window.location.assign(result.data.redirectUrl);
-      return;
+      if (form.state.paymentMethod === "google_pay" || form.state.paymentMethod === "saved_card") {
+        router.push(`/checkout/payment/success?order=${encodeURIComponent(result.data.orderNumber)}`);
+        return;
+      }
+      clear();
+      removePromoCode();
+      router.push(`/checkout/success?orderId=${encodeURIComponent(result.data.orderNumber)}`);
+    } catch (error) {
+      setSubmitting(false);
+      setSubmitError(error instanceof Error ? error.message : "გადახდის დაწყება ვერ მოხერხდა.");
     }
-
-    setOrderPlaced(true);
-    clear();
-    removePromoCode();
-    router.push(`/checkout/success?orderId=${encodeURIComponent(result.data.orderNumber)}`);
   }
 
   return (
@@ -190,6 +261,14 @@ export function CheckoutPageClient() {
               onInstallmentMonthsChange={form.setInstallmentMonths}
               total={total}
               error={form.getError("paymentMethod")}
+              capabilities={capabilities}
+              savedMethods={savedMethods}
+              isLoggedIn={isLoggedIn}
+              saveCardConsent={saveCardConsent}
+              onSaveCardConsent={setSaveCardConsent}
+              savedPaymentMethodId={savedPaymentMethodId}
+              onSavedPaymentMethodId={setSavedPaymentMethodId}
+              loanSummary={loanMonth && loanDiscountCode ? `${loanMonth} თვე` : null}
             />
           </div>
 

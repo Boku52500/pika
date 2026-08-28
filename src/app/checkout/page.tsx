@@ -3,6 +3,9 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { CheckoutPageClient } from "@/components/checkout/CheckoutPageClient";
 import { noIndexMetadata } from "@/lib/seo";
+import { getCheckoutPaymentCapabilities } from "@/server/payments/bog/capabilities";
+import { getSessionCustomer } from "@/server/auth/session";
+import { listCustomerSavedPaymentMethods } from "@/server/payments/bog/savedCard";
 
 export const metadata: Metadata = {
   title: "შეკვეთის გაფორმება — Pika",
@@ -10,12 +13,24 @@ export const metadata: Metadata = {
   ...noIndexMetadata,
 };
 
-export default function CheckoutPage() {
+export default async function CheckoutPage() {
+  const capabilities = getCheckoutPaymentCapabilities();
+  const session = await getSessionCustomer();
+  const savedMethods =
+    session && capabilities.savedCard ? await listCustomerSavedPaymentMethods(session.id) : [];
   return (
     <>
       <Header />
       <main className="flex-1">
-        <CheckoutPageClient />
+        <CheckoutPageClient
+          capabilities={capabilities}
+          savedMethods={savedMethods.map((row) => ({
+            id: row.id,
+            maskedPan: row.maskedPan,
+            cardType: row.cardType,
+            cardExpiry: row.cardExpiry,
+          }))}
+        />
       </main>
       <Footer />
     </>

@@ -13,6 +13,8 @@ describe("mapBogStatusToAttempt", () => {
     assert.equal(mapBogStatusToAttempt("completed"), "paid");
     assert.equal(mapBogStatusToAttempt("rejected"), "failed");
     assert.equal(mapBogStatusToAttempt("refund_requested"), "processing");
+    assert.equal(mapBogStatusToAttempt("blocked"), "authorized");
+    assert.equal(mapBogStatusToAttempt("partial_completed"), "paid");
     assert.equal(mapBogStatusToAttempt("refunded"), "refunded");
     assert.equal(mapBogStatusToAttempt("refunded_partially"), "partially_refunded");
   });

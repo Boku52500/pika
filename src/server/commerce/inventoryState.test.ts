@@ -88,3 +88,12 @@ describe("stock ledger simulation", () => {
     assert.equal(state, "committed");
   });
 });
+
+describe("inventoryEventForDerivedPayment", () => {
+  it("does not commit or release on authorized; commits only on paid-like", () => {
+    assert.equal(inventoryEventForDerivedPayment("authorized"), null);
+    assert.equal(inventoryEventForDerivedPayment("processing"), null);
+    assert.equal(inventoryEventForDerivedPayment("paid"), "paid");
+    assert.equal(inventoryEventForDerivedPayment("failed"), "unpaid_terminal");
+  });
+});

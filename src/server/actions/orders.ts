@@ -21,6 +21,49 @@ import { notifyOrderConfirmation } from "@/server/email/notify";
 import { applyStockMutation, InventoryUserError } from "@/server/commerce/inventory";
 import { placePromotionRedemption, PromoUserError } from "@/server/commerce/promoRedemption";
 import { isPaidLikePaymentStatus } from "@/server/commerce/inventoryState";
+import { isOnlineBogMethod } from "@/server/payments/methods";
+import { getBogMerchantCapabilities } from "@/server/payments/bog/capabilities";
+import type { StartBogPaymentOptions } from "@/server/payments/initiate";
+import type { OrderSubmissionInput } from "@/server/validation/order";
+
+async function bogStartOptions(
+  payload: OrderSubmissionInput,
+  customerId: string | null,
+): Promise<StartBogPaymentOptions> {
+  const options: StartBogPaymentOptions = { method: payload.paymentMethod };
+  if (payload.paymentMethod === "google_pay") {
+    if (!payload.googlePayToken) throw new OrderUserError("Google Pay ტოკენი ვერ მოიძებნა.");
+    options.googlePayToken = payload.googlePayToken;
+    options.paymentMethods = ["google_pay"];
+  }
+  if (payload.paymentMethod === "apple_pay") {
+    options.applePayExternal = true;
+    options.paymentMethods = ["apple_pay"];
+  }
+  if (payload.paymentMethod === "bog_loan" || payload.paymentMethod === "bnpl") {
+    if (!payload.loanMonth || !payload.loanDiscountCode) {
+      throw new OrderUserError("აირჩიეთ განვადების პირობები ბანკის კალკულატორიდან.");
+    }
+    options.loan = { month: payload.loanMonth, type: payload.loanDiscountCode };
+    options.paymentMethods = [payload.paymentMethod];
+  }
+  if (payload.paymentMethod === "saved_card") {
+    if (!customerId || !payload.savedPaymentMethodId) {
+      throw new OrderUserError("შენახული ბარათით გადახდა მხოლოდ ავტორიზებული მომხმარებლისთვისაა.");
+    }
+    const saved = await prisma.savedPaymentMethod.findFirst({
+      where: { id: payload.savedPaymentMethodId, customerId, deletedAt: null, consent: "recurrent" },
+    });
+    if (!saved) throw new OrderUserError("გადახდის მეთოდი ვერ მოიძებნა");
+    options.parentOrderId = saved.parentOrderId;
+    options.savedPaymentMethodId = saved.id;
+    options.method = "saved_card";
+  }
+  if (payload.saveCardConsent === "recurrent" && customerId) {
+    options.saveCardConsent = "recurrent";
+  }
+  return options;
+}
 
 class OrderUserError extends Error {
   constructor(message: string) {
@@ -73,10 +116,21 @@ function setConfirmCookie(orderNumber: string) {
   });
 }
 
-async function continueCardPayment(orderId: string, orderNumber: string) {
+async function continueCardPayment(
+  orderId: string,
+  orderNumber: string,
+  options?: StartBogPaymentOptions,
+) {
   try {
-    const { redirectUrl } = await startBogPaymentForOrder(orderId);
-    return { ok: true as const, data: { orderNumber, redirectUrl } };
+    const started = await startBogPaymentForOrder(orderId, options);
+    return {
+      ok: true as const,
+      data: {
+        orderNumber,
+        redirectUrl: started.redirectUrl,
+        applePay: started.applePay,
+      },
+    };
   } catch (error) {
     if (error instanceof PaymentUserError) {
       return { ok: false as const, message: error.message, orderNumber };
@@ -94,17 +148,17 @@ async function replayExistingCheckout(order: {
   orderNumber: string;
   paymentMethod: string;
   paymentStatus: string;
-}): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string }>> {
+}): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string; applePay?: { providerOrderId: string; result: unknown } }>> {
   await setConfirmCookie(order.orderNumber);
-  if (order.paymentMethod === "card" && !isPaidLikePaymentStatus(order.paymentStatus)) {
-    return continueCardPayment(order.id, order.orderNumber);
+  if (isOnlineBogMethod(order.paymentMethod) && !isPaidLikePaymentStatus(order.paymentStatus)) {
+    return continueCardPayment(order.id, order.orderNumber, { method: order.paymentMethod });
   }
   return { ok: true, data: { orderNumber: order.orderNumber } };
 }
 
 export async function createOrder(
   input: unknown,
-): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string }>> {
+): Promise<ActionResult<{ orderNumber: string; redirectUrl?: string; applePay?: { providerOrderId: string; result: unknown } }>> {
   const parsed = orderSubmissionSchema.safeParse(input);
   if (!parsed.success) {
     const { message, fieldErrors } = firstZodMessage(parsed.error);
@@ -117,7 +171,7 @@ export async function createOrder(
   if (!(await consumeRateLimit(`checkout:ip:${ip}`, 20, 15 * 60 * 1000))) {
     return { ok: false, message: "ძალიან ბევრი მცდელობაა. სცადეთ მოგვიანებით." };
   }
-  if (payload.paymentMethod === "card") {
+  if (isOnlineBogMethod(payload.paymentMethod)) {
     if (!(await consumeRateLimit(`payment:ip:${ip}`, 10, 15 * 60 * 1000))) {
       return { ok: false, message: "ძალიან ბევრი მცდელობაა. სცადეთ მოგვიანებით." };
     }
@@ -126,7 +180,26 @@ export async function createOrder(
     }
   }
   const promoCode = payload.promoCode?.trim().toUpperCase() || null;
-  const cardCheckout = payload.paymentMethod === "card";
+  const cardCheckout = isOnlineBogMethod(payload.paymentMethod);
+  const caps = getBogMerchantCapabilities();
+  if (payload.paymentMethod === "google_pay" && !caps.externalGooglePay) {
+    return { ok: false, message: "Google Pay ამჟამად მიუწვდომელია." };
+  }
+  if (payload.paymentMethod === "apple_pay" && !caps.externalApplePay) {
+    return { ok: false, message: "Apple Pay ამჟამად მიუწვდომელია." };
+  }
+  if (payload.paymentMethod === "bog_loan" && !caps.installment) {
+    return { ok: false, message: "საქართველოს ბანკის განვადება ამჟამად მიუწვდომელია." };
+  }
+  if (payload.paymentMethod === "bnpl" && !caps.bnpl) {
+    return { ok: false, message: "განვადება ამჟამად მიუწვდომელია." };
+  }
+  if (payload.paymentMethod === "saved_card" && (!caps.savedCardRecurrent || !session?.id || !payload.savedPaymentMethodId)) {
+    return { ok: false, message: "შენახული ბარათით გადახდა მხოლოდ ავტორიზებული მომხმარებლისთვისაა." };
+  }
+  if (payload.saveCardConsent === "recurrent" && (!caps.savedCardRecurrent || !session?.id)) {
+    return { ok: false, message: "ბარათის შენახვა მხოლოდ ავტორიზებული მომხმარებლისთვისაა." };
+  }
 
   const existing = await prisma.order.findUnique({
     where: { checkoutIdempotencyKey: payload.checkoutIdempotencyKey },
@@ -338,7 +411,7 @@ export async function createOrder(
       }
 
       if (cardCheckout) {
-        await createPendingCardPayment(tx, { id: order.id, total: order.total });
+        await createPendingCardPayment(tx, { id: order.id, total: order.total }, { method: payload.paymentMethod });
       }
 
       return { orderNumber: order.orderNumber, orderId: order.id, paymentMethod: payload.paymentMethod };
@@ -347,8 +420,8 @@ export async function createOrder(
     await setConfirmCookie(placed.orderNumber);
     scheduleEmail(() => notifyOrderConfirmation(placed.orderId));
 
-    if (placed.paymentMethod === "card") {
-      return continueCardPayment(placed.orderId, placed.orderNumber);
+    if (isOnlineBogMethod(placed.paymentMethod)) {
+      return continueCardPayment(placed.orderId, placed.orderNumber, await bogStartOptions(payload, session?.id ?? null));
     }
 
     return { ok: true, data: { orderNumber: placed.orderNumber } };

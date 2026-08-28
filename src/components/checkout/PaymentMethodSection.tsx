@@ -1,13 +1,24 @@
 "use client";
 
-import { CreditCard, Landmark, Banknote, ShieldCheck } from "lucide-react";
-import { paymentMethods, installmentProviders, type PaymentMethodId } from "@/lib/checkout";
+import { CreditCard, Landmark, Banknote, ShieldCheck, Wallet } from "lucide-react";
+import {
+  paymentMethods,
+  installmentProviders,
+  type PaymentMethodId,
+  type PublicCheckoutCapabilities,
+  type SavedCheckoutCard,
+} from "@/lib/checkout";
 import { formatPrice, cn } from "@/lib/utils";
 
 const iconByMethod: Record<PaymentMethodId, typeof CreditCard> = {
   card: CreditCard,
   installment: Landmark,
   "cash-on-delivery": Banknote,
+  google_pay: Wallet,
+  apple_pay: Wallet,
+  bog_loan: Landmark,
+  bnpl: Landmark,
+  saved_card: CreditCard,
 };
 
 /**
@@ -24,6 +35,14 @@ export function PaymentMethodSection({
   onInstallmentMonthsChange,
   total,
   error,
+  capabilities,
+  savedMethods = [],
+  isLoggedIn = false,
+  saveCardConsent,
+  onSaveCardConsent,
+  savedPaymentMethodId,
+  onSavedPaymentMethodId,
+  loanSummary,
 }: {
   value: PaymentMethodId | null;
   onChange: (value: PaymentMethodId) => void;
@@ -31,7 +50,32 @@ export function PaymentMethodSection({
   onInstallmentMonthsChange: (months: number) => void;
   total: number;
   error?: string;
+  capabilities?: PublicCheckoutCapabilities | null;
+  savedMethods?: SavedCheckoutCard[];
+  isLoggedIn?: boolean;
+  saveCardConsent?: "recurrent" | null;
+  onSaveCardConsent?: (value: "recurrent" | null) => void;
+  savedPaymentMethodId?: string | null;
+  onSavedPaymentMethodId?: (id: string) => void;
+  loanSummary?: string | null;
 }) {
+  const visibleExtras: Array<{ id: PaymentMethodId; label: string; description: string }> = [];
+  if (capabilities?.externalGooglePay) {
+    visibleExtras.push({ id: "google_pay", label: "Google Pay", description: "გადახდა Pika-ს გვერდზე Google Pay-ით" });
+  }
+  if (capabilities?.externalApplePay) {
+    visibleExtras.push({ id: "apple_pay", label: "Apple Pay", description: "გადახდა Pika-ს გვერდზე Apple Pay-ით" });
+  }
+  if (capabilities?.bogLoan) {
+    visibleExtras.push({ id: "bog_loan", label: "საქართველოს ბანკის განვადება", description: "პირობებს ბანკის კალკულატორი აჩვენებს" });
+  }
+  if (capabilities?.bnpl) {
+    visibleExtras.push({ id: "bnpl", label: "BNPL", description: "Buy Now Pay Later საქართველოს ბანკის პირობებით" });
+  }
+  if (capabilities?.savedCard && isLoggedIn && savedMethods.length > 0) {
+    visibleExtras.push({ id: "saved_card", label: "შენახული ბარათი", description: "გადახდა შენახული ბარათით, PAN-ის ხელახლა შეყვანის გარეშე" });
+  }
+
   return (
     <section
       id="paymentMethod"
@@ -136,6 +180,77 @@ export function PaymentMethodSection({
             საბოლოო პირობებსა და საკომისიოს დაადასტურებთ ბანკთან შემდეგ ეტაპზე.
           </p>
         </div>
+      ) : null}
+
+      {visibleExtras.length > 0 ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {visibleExtras.map((method) => {
+            const Icon = iconByMethod[method.id];
+            const selected = value === method.id;
+            return (
+              <button
+                key={method.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => onChange(method.id)}
+                className={cn(
+                  "flex flex-col gap-2 rounded-[var(--radius-md)] border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400",
+                  selected ? "border-brand-600 bg-brand-50" : "border-border-strong hover:border-ink-900",
+                )}
+              >
+                <Icon className="size-5 text-brand-600" strokeWidth={1.75} />
+                <span className="text-small font-semibold text-text">{method.label}</span>
+                <span className="text-label text-text-muted">{method.description}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {value === "card" && isLoggedIn && capabilities?.saveCardRecurrent && onSaveCardConsent ? (
+        <label className="flex items-start gap-2.5 text-small text-text">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={saveCardConsent === "recurrent"}
+            onChange={(event) => onSaveCardConsent(event.target.checked ? "recurrent" : null)}
+          />
+          <span>შეინახე ბარათი შემდეგი გადახდებისთვის. ავტომატური ჩამოჭრის უფლებას ეს არ იძლევა.</span>
+        </label>
+      ) : null}
+
+      {value === "saved_card" && savedMethods.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {savedMethods.map((method) => (
+            <label key={method.id} className="flex items-center gap-2 text-small">
+              <input
+                type="radio"
+                name="saved-card"
+                checked={savedPaymentMethodId === method.id}
+                onChange={() => onSavedPaymentMethodId?.(method.id)}
+              />
+              <span>
+                {method.cardType ?? "ბარათი"} {method.maskedPan ?? ""} {method.cardExpiry ? `· ${method.cardExpiry}` : ""}
+              </span>
+            </label>
+          ))}
+        </div>
+      ) : null}
+
+      {value === "bog_loan" || value === "bnpl" ? (
+        <p className="text-small text-text-muted">
+          პირობებს ხსნის საქართველოს ბანკის კალკულატორი. Pika პროცენტს ან ყოველთვიურ თანხას არ ითვლის.
+          {loanSummary ? ` არჩეული პირობა: ${loanSummary}` : ""}
+        </p>
+      ) : null}
+
+      {value === "google_pay" ? (
+        <p className="text-small text-text-muted">შეკვეთის დადასტურებისას გაიხსნება Google Pay. ტოკენი სერვერზე არ ინახება.</p>
+      ) : null}
+
+      {value === "apple_pay" ? (
+        <p className="text-small text-text-muted">შეკვეთის დადასტურებისას გაიხსნება Apple Pay. ტოკენი სერვერზე არ ინახება.</p>
       ) : null}
     </section>
   );

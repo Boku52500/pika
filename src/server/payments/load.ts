@@ -9,6 +9,7 @@ import { reconcileBogPaymentDetails } from "@/server/payments/reconcile";
 import { customerRefundSnapshot } from "@/server/payments/refundable";
 import { logWarn } from "@/server/log";
 import type { PaymentPageData, StorefrontPaymentAttempt } from "@/lib/paymentView";
+import { isOnlineBogMethod } from "@/server/payments/methods";
 
 function mapAttempt(row: {
   id: string;
@@ -83,7 +84,7 @@ export async function getPaymentPageData(
   });
   if (!row) return null;
 
-  if (options?.reconcile !== false && row.paymentMethod === "card") {
+  if (options?.reconcile !== false && isOnlineBogMethod(row.paymentMethod)) {
     await maybeReconcileLatest(row.id);
   }
 
@@ -100,7 +101,7 @@ export async function getPaymentPageData(
   const latest = attempts[attempts.length - 1] ?? null;
   const paid = attempts.some((attempt) => isPaidAttemptStatus(attempt.status));
   const canRetry =
-    refreshed.paymentMethod === "card" &&
+    isOnlineBogMethod(refreshed.paymentMethod) &&
     !paid &&
     (latest ? isRetryableAttemptStatus(latest.status) : true);
   const refundView = customerRefundSnapshot(refreshed.payments);

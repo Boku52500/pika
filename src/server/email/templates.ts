@@ -22,7 +22,7 @@ export type OrderEmailSnapshot = {
   orderNumber: string;
   firstName: string;
   customerEmail: string;
-  paymentMethod: "card" | "installment" | "cash_on_delivery";
+  paymentMethod: string;
   paymentStatus: string;
   orderStatus?: string;
   deliveryMethod: "standard" | "express";
@@ -65,25 +65,31 @@ export function formatEmailDateTime(date: Date): string {
   return `${shifted.getUTCDate()} ${month} ${shifted.getUTCFullYear()}, ${hh}:${mm}`;
 }
 
-export function orderConfirmationCopy(paymentMethod: OrderEmailSnapshot["paymentMethod"]): {
+export function orderConfirmationCopy(paymentMethod: string): {
   headline: string;
   body: string;
 } {
-  if (paymentMethod === "card") {
-    return {
-      headline: "შეკვეთა მიღებულია",
-      body: "შეკვეთა მიღებულია. ბარათით გადახდის დასრულების შემდეგ მიიღებთ გადახდის დადასტურებას.",
-    };
-  }
   if (paymentMethod === "cash_on_delivery") {
     return {
       headline: "შეკვეთა მიღებულია",
       body: "შეკვეთა მიღებულია. თანხას გადაიხდით მიწოდებისას.",
     };
   }
+  if (paymentMethod === "installment") {
+    return {
+      headline: "შეკვეთა მიღებულია",
+      body: "შეკვეთა მიღებულია. განვადების პირობებს ბანკი დაადასტურებს ცალკე.",
+    };
+  }
+  if (paymentMethod === "card") {
+    return {
+      headline: "შეკვეთა მიღებულია",
+      body: "შეკვეთა მიღებულია. ბარათით გადახდის დასრულების შემდეგ მიიღებთ გადახდის დადასტურებას.",
+    };
+  }
   return {
     headline: "შეკვეთა მიღებულია",
-    body: "შეკვეთა მიღებულია. განვადების პირობებს ბანკი დაადასტურებს ცალკე.",
+    body: "შეკვეთა მიღებულია. ონლაინ გადახდის დასრულების შემდეგ მიიღებთ გადახდის დადასტურებას.",
   };
 }
 
@@ -150,7 +156,8 @@ export function renderOrderConfirmationEmail(
 ): { subject: string; html: string; text: string } {
   const copy = orderConfirmationCopy(order.paymentMethod);
   const subject = `შეკვეთა მიღებულია — ${order.orderNumber}`;
-  const paymentLabel = PAYMENT_METHOD_LABEL[order.paymentMethod];
+  const paymentLabel =
+    PAYMENT_METHOD_LABEL[order.paymentMethod as keyof typeof PAYMENT_METHOD_LABEL] ?? order.paymentMethod;
   const html = emailLayout({
     title: copy.headline,
     preheader: copy.body,
@@ -270,7 +277,7 @@ export function renderOrderStatusEmail(
 }
 
 export function assertNoPrematurePaidCopy(html: string, paymentMethod: string): boolean {
-  if (paymentMethod !== "card") return true;
+  if (paymentMethod === "cash_on_delivery" || paymentMethod === "installment") return true;
   return !html.includes("გადახდა დადასტურებულია") && !html.includes("გადახდილია");
 }
 

@@ -1,5 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { isValidMoneyInput, moneyToTetri, parseMoneyInput, tetriToMoney, tetriToNumber, type Money } from "@/server/money";
+import { supportsBogPartialRefund } from "@/server/payments/methods";
 
 export const IN_FLIGHT_REFUND_STATUSES = ["requested", "processing"] as const;
 export const COMPLETED_REFUND_STATUS = "completed" as const;
@@ -44,10 +45,9 @@ export function isInFlightRefundStatus(status: string): boolean {
   return status === "requested" || status === "processing";
 }
 
-/** Partial refunds are documented for card (and Apple/Google Pay). Pika only charges cards. */
+/** Partial refunds are documented for card, Apple Pay and Google Pay. */
 export function supportsPartialRefund(method: string | null | undefined): boolean {
-  if (!method) return true;
-  return method.trim().toLowerCase() === "card";
+  return supportsBogPartialRefund(method);
 }
 
 export function confirmedRefundedTetri(input: {

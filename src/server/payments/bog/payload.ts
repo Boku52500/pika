@@ -1,5 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { moneyToNumber, moneyToTetri } from "@/server/money";
+import type { BogSplitConfig } from "@/server/payments/bog/split";
 
 export type BogBasketLine = {
   productId: string;
@@ -7,6 +8,23 @@ export type BogBasketLine = {
   quantity: number;
   unitPrice: Prisma.Decimal | string | number;
   lineTotal: Prisma.Decimal | string | number;
+};
+
+export type BogPaymentMethodValue =
+  | "card"
+  | "google_pay"
+  | "apple_pay"
+  | "bog_p2p"
+  | "bog_loyalty"
+  | "bnpl"
+  | "bog_loan"
+  | "gift_card";
+
+export type BogCreateOrderConfig = {
+  loan?: { type?: string; month?: number };
+  google_pay?: { external?: boolean; google_pay_token?: string };
+  apple_pay?: { external?: boolean };
+  split?: BogSplitConfig;
 };
 
 export type BogCreateOrderInput = {
@@ -20,12 +38,17 @@ export type BogCreateOrderInput = {
   deliveryFee: Prisma.Decimal | string | number;
   items: BogBasketLine[];
   buyerName?: string;
+  capture?: "automatic" | "manual";
+  paymentMethods?: BogPaymentMethodValue[];
+  applicationType?: "web" | "mobile";
+  config?: BogCreateOrderConfig;
 };
 
 export type BogCreateOrderBody = {
   callback_url: string;
   external_order_id: string;
-  capture: "automatic";
+  capture: "automatic" | "manual";
+  application_type?: "web" | "mobile";
   purchase_units: {
     currency: string;
     total_amount: number;
@@ -43,8 +66,9 @@ export type BogCreateOrderBody = {
     success: string;
     fail: string;
   };
-  payment_method: ["card"];
+  payment_method: BogPaymentMethodValue[];
   buyer?: { full_name: string };
+  config?: BogCreateOrderConfig;
 };
 
 function moneyJson(value: Prisma.Decimal | string | number): number {
@@ -57,7 +81,7 @@ export function buildBogCreateOrderBody(input: BogCreateOrderInput): BogCreateOr
   const body: BogCreateOrderBody = {
     callback_url: input.callbackUrl,
     external_order_id: input.externalOrderId,
-    capture: "automatic",
+    capture: input.capture ?? "automatic",
     purchase_units: {
       currency: input.currency,
       total_amount: moneyJson(input.total),
@@ -73,7 +97,7 @@ export function buildBogCreateOrderBody(input: BogCreateOrderInput): BogCreateOr
       success: input.successUrl,
       fail: input.failUrl,
     },
-    payment_method: ["card"],
+    payment_method: input.paymentMethods?.length ? input.paymentMethods : ["card"],
   };
 
   if (discount > 0) {
@@ -85,6 +109,12 @@ export function buildBogCreateOrderBody(input: BogCreateOrderInput): BogCreateOr
   const buyerName = input.buyerName?.trim();
   if (buyerName) {
     body.buyer = { full_name: buyerName.slice(0, 120) };
+  }
+  if (input.applicationType) {
+    body.application_type = input.applicationType;
+  }
+  if (input.config && Object.keys(input.config).length > 0) {
+    body.config = input.config;
   }
   return body;
 }
@@ -106,4 +136,11 @@ export function amountsMatch(
 ): boolean {
   if (actual == null) return false;
   return moneyToTetri(expected) === moneyToTetri(actual);
+}
+
+export function amountLessOrEqual(
+  left: Prisma.Decimal | string | number,
+  right: Prisma.Decimal | string | number,
+): boolean {
+  return moneyToTetri(left) <= moneyToTetri(right);
 }

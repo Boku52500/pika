@@ -11,10 +11,12 @@ import {
   shouldApplyAttemptStatus,
 } from "@/server/payments/bog/status";
 import { planRefundRowUpdates, providerRefundAmountFromDetails } from "@/server/payments/refundReconcile";
+import { parseBogAmount } from "@/server/payments/bog/payload";
 import { scheduleEmail } from "@/server/email/schedule";
 import { notifyPaymentPaid, notifyRefund } from "@/server/email/notify";
 import { planPaymentEmails } from "@/server/email/events";
 import { syncCommerceAfterPaymentReconciliation } from "@/server/commerce/sync";
+import { persistSavedCardFromDetails } from "@/server/payments/bog/savedCard";
 
 export type ReconcileResult = {
   paymentId: string;
@@ -32,7 +34,7 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
     (await prisma.payment.findFirst({
       where: { provider: "bog", providerOrderId: details.order_id },
       include: {
-        order: { select: { id: true, orderNumber: true, paymentStatus: true } },
+        order: { select: { id: true, orderNumber: true, paymentStatus: true, customerId: true } },
         refunds: { orderBy: { createdAt: "asc" } },
       },
       orderBy: { createdAt: "desc" },
@@ -45,7 +47,7 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
             order: { orderNumber: details.external_order_id },
           },
           include: {
-            order: { select: { id: true, orderNumber: true, paymentStatus: true } },
+            order: { select: { id: true, orderNumber: true, paymentStatus: true, customerId: true } },
             refunds: { orderBy: { createdAt: "asc" } },
           },
           orderBy: { createdAt: "desc" },
@@ -87,10 +89,18 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
   }
 
   const previousStatus = payment.status;
-  const incomingStatus = mapBogStatusToAttempt(details.order_status.key);
+  let incomingStatus = mapBogStatusToAttempt(details.order_status.key);
+  if (payment.status === "authorized" && incomingStatus === "failed") {
+    incomingStatus = "voided";
+  }
   const applyStatus = shouldApplyAttemptStatus(payment.status, incomingStatus);
   const nextStatus = applyStatus ? incomingStatus : payment.status;
-  const terminal = nextStatus === "paid" || nextStatus === "failed" || nextStatus === "refunded" || nextStatus === "partially_refunded";
+  const terminal =
+    nextStatus === "paid" ||
+    nextStatus === "failed" ||
+    nextStatus === "voided" ||
+    nextStatus === "refunded" ||
+    nextStatus === "partially_refunded";
   const providerRefundAmount = providerRefundAmountFromDetails(details.purchase_units?.refund_amount);
   const refundUpdates = planRefundRowUpdates({
     refunds: payment.refunds,
@@ -98,6 +108,9 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
     providerRefundAmount,
     actions: details.actions,
   });
+  const authorizedAmount = details.order_status.key === "blocked" ? parseBogAmount(details.purchase_units?.request_amount) : undefined;
+  const capturedAmount =
+    nextStatus === "paid" ? parseBogAmount(details.purchase_units?.transfer_amount) : undefined;
 
   await prisma.$transaction(async (tx) => {
     await tx.payment.update({
@@ -113,6 +126,15 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
         responseCode: details.payment_detail?.code ?? undefined,
         responseDescription: details.payment_detail?.code_description ?? undefined,
         rejectReason: details.reject_reason ?? undefined,
+        captureMode: details.capture === "manual" || details.capture === "automatic" ? details.capture : undefined,
+        paymentOption: details.payment_detail?.payment_option ?? undefined,
+        savedCardType: details.payment_detail?.saved_card_type ?? undefined,
+        parentProviderOrderId: details.payment_detail?.parent_order_id ?? undefined,
+        payerIdentifier: details.payment_detail?.payer_identifier ?? undefined,
+        cardExpiryDate: details.payment_detail?.card_expiry_date ?? undefined,
+        splitStatus: details.split?.split_status ?? undefined,
+        authorizedAmount: authorizedAmount ?? undefined,
+        capturedAmount: capturedAmount ?? undefined,
         completedAt: terminal ? (payment.completedAt ?? new Date()) : undefined,
       },
     });
@@ -176,6 +198,21 @@ export async function reconcileBogPaymentDetails(details: BogPaymentDetails): Pr
     scheduleEmail(() => notifyRefund(payment.id, "partial"));
   } else if (plan === "refund_full") {
     scheduleEmail(() => notifyRefund(payment.id, "full"));
+  }
+
+  if (nextStatus === "paid" || nextStatus === "authorized") {
+    const savedRef = details.payment_detail?.saved_card_type
+      ? details.payment_detail.parent_order_id ?? details.order_id
+      : undefined;
+    await persistSavedCardFromDetails({
+      customerId: payment.order.customerId,
+      paymentId: payment.id,
+      parentOrderId: savedRef,
+      savedCardType: details.payment_detail?.saved_card_type,
+      maskedPan: details.payment_detail?.payer_identifier,
+      cardType: details.payment_detail?.card_type,
+      cardExpiry: details.payment_detail?.card_expiry_date,
+    });
   }
 
   await syncCommerceAfterPaymentReconciliation(payment.orderId);

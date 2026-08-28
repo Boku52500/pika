@@ -125,6 +125,21 @@ const bogPaymentDetailSchema = z
     code_description: optionalBogString,
     payment_option: optionalBogString,
     card_type: optionalBogString,
+    payer_identifier: optionalBogString,
+    card_expiry_date: optionalBogString,
+    saved_card_type: optionalBogString,
+    parent_order_id: optionalBogString,
+  })
+  .passthrough()
+  .nullable()
+  .optional()
+  .transform((value) => value ?? undefined);
+
+const bogSplitSchema = z
+  .object({
+    split_status: optionalBogString,
+    currency: optionalBogString,
+    request_channel: optionalBogString,
   })
   .passthrough()
   .nullable()
@@ -178,6 +193,7 @@ export const bogPaymentDetailsSchema = z
     purchase_units: bogPurchaseUnitsSchema,
     payment_detail: bogPaymentDetailSchema,
     actions: bogActionsSchema,
+    split: bogSplitSchema,
     reject_reason: optionalBogString,
   })
   .passthrough();
@@ -210,13 +226,21 @@ export const bogTokenResponseSchema = z.object({
   expires_in: z.number().optional(),
 });
 
-export const bogCreateOrderResponseSchema = z.object({
-  id: z.string().min(1),
-  _links: z.object({
-    details: z.object({ href: z.string().optional() }).optional(),
-    redirect: z.object({ href: z.string().min(1) }),
-  }),
-});
+export const bogCreateOrderResponseSchema = z
+  .object({
+    id: z.string().min(1),
+    status: optionalBogString,
+    result: z.unknown().optional(),
+    order_details: z.unknown().optional(),
+    _links: z
+      .object({
+        details: z.object({ href: z.string().optional() }).optional(),
+        redirect: z.object({ href: z.string().min(1) }).optional(),
+        accept: z.object({ href: z.string().min(1) }).optional(),
+      })
+      .optional(),
+  })
+  .passthrough();
 
 export type BogCreateOrderResponse = z.infer<typeof bogCreateOrderResponseSchema>;
 
@@ -239,6 +263,10 @@ export type BogPaymentDetails = {
     code_description?: string;
     payment_option?: string;
     card_type?: string;
+    payer_identifier?: string;
+    card_expiry_date?: string;
+    saved_card_type?: string;
+    parent_order_id?: string;
   };
   actions?: Array<{
     action_id: string;
@@ -246,6 +274,11 @@ export type BogPaymentDetails = {
     status?: string;
     amount?: string;
   }>;
+  split?: {
+    split_status?: string;
+    currency?: string;
+    request_channel?: string;
+  };
   reject_reason?: string;
 };
 
@@ -286,9 +319,20 @@ export function canonicalizeBogPaymentDetails(
           code_description: data.payment_detail.code_description,
           payment_option: data.payment_detail.payment_option,
           card_type: data.payment_detail.card_type,
+          payer_identifier: data.payment_detail.payer_identifier,
+          card_expiry_date: data.payment_detail.card_expiry_date,
+          saved_card_type: data.payment_detail.saved_card_type,
+          parent_order_id: data.payment_detail.parent_order_id,
         }
       : undefined,
     actions: data.actions,
+    split: data.split
+      ? {
+          split_status: data.split.split_status,
+          currency: data.split.currency,
+          request_channel: data.split.request_channel,
+        }
+      : undefined,
     reject_reason: data.reject_reason,
   };
 }

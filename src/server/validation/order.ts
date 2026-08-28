@@ -28,10 +28,26 @@ export const orderSubmissionSchema = z.object({
   address: addressSnapshotSchema,
   deliveryMethod: z.enum(["standard", "express"]),
   paymentMethod: z
-    .enum(["card", "installment", "cash-on-delivery", "cash_on_delivery"])
+    .enum([
+      "card",
+      "installment",
+      "cash-on-delivery",
+      "cash_on_delivery",
+      "google_pay",
+      "apple_pay",
+      "bog_loan",
+      "bnpl",
+      "saved_card",
+    ])
     .transform((value) => (value === "cash-on-delivery" ? "cash_on_delivery" : value)),
   installmentMonths: z.number().int().positive().nullable().optional(),
   promoCode: z.string().trim().max(40).nullable().optional(),
+  saveCardConsent: z.enum(["recurrent"]).nullable().optional(),
+  savedPaymentMethodId: z.string().trim().min(1).nullable().optional(),
+  googlePayToken: z.string().min(1).max(200_000).nullable().optional(),
+  applePayExternal: z.boolean().optional(),
+  loanMonth: z.number().int().positive().nullable().optional(),
+  loanDiscountCode: z.string().trim().max(80).nullable().optional(),
   items: z
     .array(
       z.object({
