@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { getAppOrigin, isHttpsOrigin, parsePublicHostname } from "./src/lib/appUrl";
+import { bogCalculatorCspSources } from "./src/lib/bogSdk";
 
 function imageRemotePatterns(): { protocol: "http" | "https"; hostname: string; pathname: string }[] {
   const hosts = new Set<string>();
@@ -17,16 +18,18 @@ function imageRemotePatterns(): { protocol: "http" | "https"; hostname: string; 
 }
 
 function contentSecurityPolicy(): string {
+  const bog = bogCalculatorCspSources();
   return [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-    "style-src 'self' 'unsafe-inline'",
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${bog.scriptSrc.join(" ")}`,
+    `style-src 'self' 'unsafe-inline' ${bog.styleSrc.join(" ")}`,
     "img-src 'self' data: blob: http: https:",
-    "font-src 'self'",
-    "connect-src 'self'",
+    `font-src 'self' ${bog.fontSrc.join(" ")}`,
+    `connect-src 'self' ${bog.connectSrc.join(" ")}`,
+    `frame-src 'self' ${bog.frameSrc.join(" ")}`,
     "frame-ancestors 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    `form-action 'self' ${bog.formAction.join(" ")}`,
     "object-src 'none'",
   ].join("; ");
 }

@@ -37,6 +37,7 @@ export function PaymentMethodSection({
   savedPaymentMethodId,
   onSavedPaymentMethodId,
   loanSummary,
+  calculatorStatus = "idle",
 }: {
   value: PaymentMethodId | null;
   onChange: (value: PaymentMethodId) => void;
@@ -49,6 +50,7 @@ export function PaymentMethodSection({
   savedPaymentMethodId?: string | null;
   onSavedPaymentMethodId?: (id: string) => void;
   loanSummary?: string | null;
+  calculatorStatus?: "idle" | "loading" | "ready" | "error";
 }) {
   const methods = visibleCheckoutPaymentMethods(capabilities);
   const visibleExtras: Array<{ id: PaymentMethodId; label: string; description: string }> = [];
@@ -190,6 +192,10 @@ export function PaymentMethodSection({
         <p className="text-small text-text-muted">
           პირობებს ხსნის საქართველოს ბანკის კალკულატორი. Pika პროცენტს ან ყოველთვიურ თანხას არ ითვლის.
           {loanSummary ? ` არჩეული პირობა: ${loanSummary}` : ""}
+          {calculatorStatus === "loading" ? " კალკულატორი იტვირთება..." : ""}
+          {calculatorStatus === "error"
+            ? " საქართველოს ბანკის კალკულატორი ვერ ჩაიტვირთა. სცადეთ თავიდან."
+            : ""}
         </p>
       ) : null}
     </section>

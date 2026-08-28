@@ -21,6 +21,8 @@ export function CheckoutOrderSummary({
   subtotal,
   deliveryFee,
   submitting = false,
+  submitDisabled,
+  submitLabel,
   error,
   paymentMethod,
   className,
@@ -29,6 +31,8 @@ export function CheckoutOrderSummary({
   subtotal: number;
   deliveryFee: number;
   submitting?: boolean;
+  submitDisabled?: boolean;
+  submitLabel?: string;
   error?: string | null;
   paymentMethod?: PaymentMethodId | null;
   className?: string;
@@ -59,8 +63,8 @@ export function CheckoutOrderSummary({
         </p>
       ) : null}
 
-      <Button type="submit" size="lg" className="w-full" disabled={submitting}>
-        {submitting ? "მუშავდება..." : "შეკვეთის დადასტურება"}
+      <Button type="submit" size="lg" className="w-full" disabled={submitDisabled ?? submitting}>
+        {submitLabel ?? (submitting ? "მუშავდება..." : "შეკვეთის დადასტურება")}
       </Button>
 
       <p className="text-label text-center normal-case tracking-normal text-text-faint">

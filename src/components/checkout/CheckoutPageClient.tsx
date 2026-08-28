@@ -24,7 +24,8 @@ import { CheckoutOrderSummary } from "./CheckoutOrderSummary";
 import { CheckoutStickyMobileBar } from "./CheckoutStickyMobileBar";
 import { requestGooglePayToken } from "./googlePay";
 import { completeApplePaySheet } from "./applePay";
-import { openBogInstallmentCalculator } from "./bogCalculator";
+import { loadBogCalculatorSdk, openBogInstallmentCalculator } from "./bogCalculator";
+import { bogCalculatorUserMessage } from "@/lib/bogSdk";
 import { acceptApplePayPayment } from "@/server/payments/actions";
 import type { PublicCheckoutCapabilities, SavedCheckoutCard } from "@/lib/checkout";
 
@@ -55,7 +56,27 @@ export function CheckoutPageClient({
   const [savedPaymentMethodId, setSavedPaymentMethodId] = useState<string | null>(savedMethods[0]?.id ?? null);
   const [loanMonth, setLoanMonth] = useState<number | null>(null);
   const [loanDiscountCode, setLoanDiscountCode] = useState<string | null>(null);
+  const [sdkStatus, setSdkStatus] = useState<"loading" | "ready" | "error" | null>(null);
   const prefilledRef = useRef(false);
+  const calculatorStatus: "idle" | "loading" | "ready" | "error" = capabilities?.bogClientId
+    ? (sdkStatus ?? "loading")
+    : "idle";
+
+  useEffect(() => {
+    const clientId = capabilities?.bogClientId;
+    if (!clientId) return;
+    let cancelled = false;
+    void loadBogCalculatorSdk(clientId)
+      .then(() => {
+        if (!cancelled) setSdkStatus("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setSdkStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [capabilities?.bogClientId]);
 
   // Prefill from the logged-in customer's profile/default address exactly
   // once — never overwrites a field the person has already started typing,
@@ -152,6 +173,7 @@ export function CheckoutPageClient({
 
       if (form.state.paymentMethod === "bog_loan" || form.state.paymentMethod === "bnpl") {
         if (!capabilities?.bogClientId) throw new Error("განვადების კალკულატორი მიუწვდომელია.");
+        if (calculatorStatus !== "ready") setSdkStatus("loading");
         const finished = await openBogInstallmentCalculator({
           clientId: capabilities.bogClientId,
           amount: total,
@@ -175,6 +197,7 @@ export function CheckoutPageClient({
             };
           },
         });
+        setSdkStatus("ready");
         rotateCheckoutIdempotencyKey();
         setOrderPlaced(true);
         setSubmitting(false);
@@ -234,9 +257,26 @@ export function CheckoutPageClient({
       router.push(`/checkout/success?orderId=${encodeURIComponent(result.data.orderNumber)}`);
     } catch (error) {
       setSubmitting(false);
-      setSubmitError(error instanceof Error ? error.message : "გადახდის დაწყება ვერ მოხერხდა.");
+      const message = bogCalculatorUserMessage(error);
+      if (
+        error instanceof Error &&
+        (error.message === "BOG calculator is unavailable" || error.message === "BOG SDK failed")
+      ) {
+        setSdkStatus("error");
+      }
+      setSubmitError(message);
     }
   }
+
+  const loanSelected =
+    form.state.paymentMethod === "bnpl" || form.state.paymentMethod === "bog_loan";
+  const calculatorBusy = loanSelected && calculatorStatus === "loading";
+  const submitDisabled = submitting || calculatorBusy;
+  const submitLabel = submitting
+    ? "მუშავდება..."
+    : calculatorBusy
+      ? "კალკულატორი იტვირთება..."
+      : "შეკვეთის დადასტურება";
 
   return (
     <form onSubmit={handleSubmit} noValidate>
@@ -291,6 +331,7 @@ export function CheckoutPageClient({
               savedPaymentMethodId={savedPaymentMethodId}
               onSavedPaymentMethodId={setSavedPaymentMethodId}
               loanSummary={loanMonth && loanDiscountCode ? `${loanMonth} თვე` : null}
+              calculatorStatus={calculatorStatus}
             />
           </div>
 
@@ -299,6 +340,8 @@ export function CheckoutPageClient({
             subtotal={subtotal}
             deliveryFee={deliveryFee}
             submitting={submitting}
+            submitDisabled={submitDisabled}
+            submitLabel={submitLabel}
             error={submitError}
             paymentMethod={form.state.paymentMethod}
             className="lg:sticky lg:top-24"
@@ -306,7 +349,12 @@ export function CheckoutPageClient({
         </div>
       </Container>
 
-      <CheckoutStickyMobileBar total={total} submitting={submitting} />
+      <CheckoutStickyMobileBar
+        total={total}
+        submitting={submitting}
+        submitDisabled={submitDisabled}
+        submitLabel={submitLabel}
+      />
     </form>
   );
 }
