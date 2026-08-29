@@ -43,17 +43,12 @@ const contacts = [
 ];
 
 function FooterHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mb-4">
-      <h3 className="text-label text-ink-900">{children}</h3>
-      <div className="mt-2 w-10 border-t-2 border-dashed border-brand-300" />
-    </div>
-  );
+  return <h3 className="text-label mb-4 font-semibold text-text">{children}</h3>;
 }
 
 export function Footer() {
   return (
-    <footer className="bg-brand-50 text-ink-700">
+    <footer className="border-t border-border bg-surface text-ink-700">
       <Container className="py-10 sm:py-12 lg:py-14">
         <Logo className="mb-10" />
 
@@ -64,7 +59,7 @@ export function Footer() {
               <ul className="space-y-2.5">
                 {col.links.map((link) => (
                   <li key={link.label}>
-                    <Link href={link.href} className="text-small text-ink-600 transition-colors hover:text-brand-600">
+                    <Link href={link.href} className="text-small text-text-muted transition-colors hover:text-brand-600">
                       {link.label}
                     </Link>
                   </li>
@@ -78,7 +73,7 @@ export function Footer() {
             <ul className="space-y-3">
               {socials.map(({ label, Icon, className }) => (
                 <li key={label}>
-                  <span className="flex items-center gap-2.5 text-small text-ink-600">
+                  <span className="flex items-center gap-2.5 text-small text-text-muted">
                     <span
                       className={cn(
                         "flex size-7 shrink-0 items-center justify-center rounded-full text-white",
@@ -100,7 +95,7 @@ export function Footer() {
               {contacts.map(({ label, href, Icon }) => {
                 const content = (
                   <>
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-500 text-white">
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white">
                       <Icon className="size-3.5" strokeWidth={2} />
                     </span>
                     {label}
@@ -109,11 +104,11 @@ export function Footer() {
                 return (
                   <li key={label}>
                     {href ? (
-                      <a href={href} className="flex items-center gap-2.5 text-small text-ink-600 transition-colors hover:text-ink-900">
+                      <a href={href} className="flex items-center gap-2.5 text-small text-text-muted transition-colors hover:text-text">
                         {content}
                       </a>
                     ) : (
-                      <div className="flex items-center gap-2.5 text-small text-ink-600">{content}</div>
+                      <div className="flex items-center gap-2.5 text-small text-text-muted">{content}</div>
                     )}
                   </li>
                 );
@@ -122,11 +117,11 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-10 flex flex-col items-center gap-4 border-t border-dashed border-brand-200 pt-6 sm:mt-12 sm:flex-row sm:justify-between">
-          <p className="text-small text-ink-500">
+        <div className="mt-10 flex flex-col items-center gap-4 border-t border-border pt-6 sm:mt-12 sm:flex-row sm:justify-between">
+          <p className="text-small text-text-faint">
             © {new Date().getFullYear()} Pika. ყველა უფლება დაცულია.
           </p>
-          <div className="text-small tnum font-medium text-ink-500">
+          <div className="text-small tnum font-medium text-text-faint">
             VISA · Mastercard · განვადება
           </div>
         </div>

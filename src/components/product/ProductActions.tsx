@@ -6,19 +6,8 @@ import { ProductVariants } from "./ProductVariants";
 import { BuyNowButton } from "./BuyNowButton";
 import { AddToCartButton } from "./AddToCartButton";
 import { WishlistButton } from "./WishlistButton";
-import { CompareButton } from "./CompareButton";
 import { ProductTrustInfo } from "./ProductTrustInfo";
 
-/**
- * The PDP purchase area: variants, quantity, then CTAs in the required
- * hierarchy (1. Buy now, 2. Add to cart, 3. Wishlist / Compare), plus a
- * subtle trust-info row. Out-of-stock disables every purchase control while
- * keeping wishlist/compare available.
- *
- * Quantity and variant selection are owned by `ProductPurchasePanel` (the
- * client wrapper rendered by the PDP page) so the same selection can also
- * reach the mobile sticky buy bar rendered alongside it.
- */
 export function ProductActions({
   product,
   variants,
@@ -57,10 +46,7 @@ export function ProductActions({
         />
       </div>
 
-      <div className="flex gap-2.5">
-        <WishlistButton product={product} labeled className="flex-1" />
-        <CompareButton productName={product.name} className="flex-1" />
-      </div>
+      <WishlistButton product={product} labeled className="w-full" />
 
       <ProductTrustInfo className="border-t border-border pt-4" />
     </div>

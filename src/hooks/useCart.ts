@@ -58,7 +58,7 @@ export function useCart() {
   const subtotal = useMemo(() => getCartSubtotal(items), [items]);
 
   const addItem = useCallback((product: Product, quantity = 1, variants?: Record<string, string>) => {
-    cartStore.addItem(product, quantity, variants);
+    return cartStore.addItem(product, quantity, variants);
   }, []);
 
   const setQuantity = useCallback((lineId: string, quantity: number) => {

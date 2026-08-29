@@ -3,7 +3,6 @@ import type {
   ProductDelivery,
   ProductImageData,
   ProductInstallment,
-  ProductReview,
   ProductSpecGroup,
   ProductVariantGroup,
 } from "@/types/product";
@@ -103,7 +102,6 @@ export function getKeyFeatures(product: Product): string[] {
   if (product.keyFeatures?.length) return product.keyFeatures;
 
   const features: string[] = [];
-  if (product.rating >= 4.5) features.push("მაღალი მომხმარებელთა შეფასება და საიმედოობა");
   if (product.badge?.label) features.push(product.badge.label);
   if (product.storage) features.push(`${product.storage} შიდა მეხსიერება`);
   if (product.ram) features.push(`${product.ram} ოპერატიული მეხსიერება`);
@@ -130,83 +128,6 @@ export function getVariantGroups(product: Product): ProductVariantGroup[] {
   return product.variants ?? [];
 }
 
-/** Small deterministic string hash — used to vary mock review copy without Math.random(). */
-function hashStringToInt(input: string): number {
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-}
-
-const reviewerNames = ["გიორგი", "ნინო", "დავითი", "მარიამი", "ლუკა", "სალომე", "ირაკლი", "ანა", "ბექა", "თამარი"];
-const reviewDates = ["12 ივნისი", "28 მაისი", "3 აპრილი", "19 მარტი"];
-
-const positiveTemplates: ((productName: string) => string)[] = [
-  (name) => `${name} ზუსტად ისეთია, როგორც აღწერაშია — ხარისხი და აწყობა მაღალ დონეზეა.`,
-  () => `ძალიან კმაყოფილი ვარ შენაძენით, მიწოდებაც სწრაფი და კარგად შეფუთული იყო.`,
-  (name) => `${name}-ს ვიყენებ ყოველდღიურად, არაფერზე ვჩივი — ღირს ფასად.`,
-  () => `მოლოდინს გადააჭარბა, გამოცდილება საწყისიდანვე პრემიუმ დონეზეა.`,
-];
-const mixedTemplates: ((productName: string) => string)[] = [
-  () => "საერთო ჯამში კარგი პროდუქტია, თუმცა ფასი ცოტა მაღალი მეჩვენა.",
-  (name) => `${name} სავსებით პასუხობს მოლოდინს, თუმცა დამატენვა ცოტა ნელია.`,
-];
-
-export function getReviews(product: Product): ProductReview[] {
-  if (product.reviews?.length) return product.reviews;
-
-  const seed = hashStringToInt(product.id);
-  const productFirstWord = product.name.split(" ")[0];
-  const count = 3;
-  const reviews: ProductReview[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const name = reviewerNames[(seed + i * 7) % reviewerNames.length];
-    const isPositive = product.rating >= 4.3 || (seed + i) % 3 !== 0;
-    const templates = isPositive ? positiveTemplates : mixedTemplates;
-    const template = templates[(seed + i * 3) % templates.length];
-    const rating = isPositive ? 5 - ((seed + i) % 2) : 3 + ((seed + i) % 2);
-
-    reviews.push({
-      id: `${product.id}-review-${i}`,
-      author: name,
-      rating,
-      date: `${reviewDates[(seed + i) % reviewDates.length]} 2026`,
-      body: template(productFirstWord),
-      verified: (seed + i) % 3 !== 0,
-    });
-  }
-
-  return reviews;
-}
-
-export function getRatingBreakdown(product: Product): Record<1 | 2 | 3 | 4 | 5, number> {
-  if (product.ratingBreakdown) {
-    return {
-      1: product.ratingBreakdown[1] ?? 0,
-      2: product.ratingBreakdown[2] ?? 0,
-      3: product.ratingBreakdown[3] ?? 0,
-      4: product.ratingBreakdown[4] ?? 0,
-      5: product.ratingBreakdown[5] ?? 0,
-    };
-  }
-
-  const total = Math.max(product.reviewCount, 1);
-  const r = product.rating;
-  const weights = [
-    Math.max(0, 3.5 - r) * 0.3, // 1 star
-    Math.max(0, 4 - r) * 0.3, // 2 stars
-    0.4, // 3 stars — small constant baseline
-    Math.max(0, 1 - Math.abs(r - 4.3)), // 4 stars
-    Math.max(0, r - 3.5), // 5 stars
-  ];
-  const sumWeights = weights.reduce((a, b) => a + b, 0) || 1;
-  const counts = weights.map((w) => Math.round((w / sumWeights) * total));
-
-  return { 1: counts[0], 2: counts[1], 3: counts[2], 4: counts[3], 5: counts[4] };
-}
-
 export function getRelatedProducts(product: Product, pool: Product[], limit = 8): Product[] {
   if (product.relatedIds?.length) {
     const byId = new Map(pool.map((p) => [p.id, p]));
@@ -221,6 +142,6 @@ export function getYouMightLikeProducts(product: Product, pool: Product[], exclu
   const excludeIds = new Set([product.id, ...exclude.map((p) => p.id)]);
   return [...pool]
     .filter((p) => !excludeIds.has(p.id))
-    .sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount)
+    .sort((a, b) => Number(b.isNew) - Number(a.isNew) || a.name.localeCompare(b.name, "ka"))
     .slice(0, limit);
 }

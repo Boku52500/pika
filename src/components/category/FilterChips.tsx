@@ -45,9 +45,6 @@ export function FilterChips({
       label: availabilityLabel[a],
       onRemove: () => onChange({ availability: filters.availability.filter((v) => v !== a) }),
     })),
-    ...(filters.minRating != null
-      ? [{ key: "rating", label: `${filters.minRating}★ და მეტი`, onRemove: () => onChange({ minRating: null }) }]
-      : []),
     ...(filters.priceMin != null || filters.priceMax != null
       ? [
           {

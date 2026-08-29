@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Category, Product } from "@/types/product";
 import {
@@ -15,7 +16,7 @@ import { productListInclude } from "@/server/catalog/include";
 import { mapProductList } from "@/server/catalog/mappers";
 import { toStorefrontCategory, toStorefrontProduct } from "@/server/catalog/toStorefrontProduct";
 import type { CatalogProduct } from "@/server/catalog/types";
-import { DEFAULT_LOCALE, resolveLocale } from "@/server/locale";
+import { DEFAULT_LOCALE, resolveLocale, type AppLocale } from "@/server/locale";
 import {
   normalizeSearchText,
   scoreBrandName,
@@ -81,6 +82,18 @@ function rankCatalogProducts(products: CatalogProduct[], query: string): Catalog
     .map((entry) => entry.product);
 }
 
+const cachedCategories = unstable_cache(
+  async (locale: AppLocale) => getCategories(locale),
+  ["search-catalog-categories"],
+  { revalidate: 300 },
+);
+
+const cachedBrands = unstable_cache(
+  async (locale: AppLocale) => getBrands(locale),
+  ["search-catalog-brands"],
+  { revalidate: 300 },
+);
+
 function toSuggestionProduct(product: Product): Product {
   return {
     id: product.id,
@@ -134,7 +147,7 @@ export async function searchCategories(query: string, locale = DEFAULT_LOCALE): 
   if (q.length < SEARCH_MIN_QUERY_LENGTH) return [];
 
   const normalized = normalizeSearchText(q);
-  const categories = await getCategories(locale);
+  const categories = await cachedCategories(locale);
 
   return categories
     .map((category) => ({ category, score: scoreCategoryName(category.name, normalized) }))
@@ -148,7 +161,7 @@ export async function searchBrands(query: string, locale = DEFAULT_LOCALE): Prom
   if (q.length < SEARCH_MIN_QUERY_LENGTH) return [];
 
   const normalized = normalizeSearchText(q);
-  const brands = await getBrands(locale);
+  const brands = await cachedBrands(locale);
 
   return brands
     .map((brand) => ({ brand: brand.name, score: scoreBrandName(brand.name, normalized) }))

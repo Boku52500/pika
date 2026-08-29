@@ -41,7 +41,7 @@ export function useSearchBox({ onNavigate }: { onNavigate?: () => void } = {}) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const debouncedQuery = useDebouncedValue(query, 150);
+  const debouncedQuery = useDebouncedValue(query, 100);
   const { recent, addRecent, removeRecent, clearRecent } = useRecentSearches();
 
   const [results, setResults] = useState<SearchSuggestions>(emptySearchSuggestions);

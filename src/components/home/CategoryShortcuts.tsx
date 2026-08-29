@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { featuredCategories } from "@/data/categories";
 import { Container } from "@/components/ui/Container";
-import { SectionHeading } from "@/components/ui/SectionHeading";
 import type { ProductVisual } from "@/types/product";
 
 const iconByVisual: Record<ProductVisual, LucideIcon> = {
@@ -33,33 +32,29 @@ const iconByVisual: Record<ProductVisual, LucideIcon> = {
 
 export function CategoryShortcuts() {
   return (
-    <section className="py-10 sm:py-14">
+    <section className="py-8 sm:py-12">
       <Container>
-        <SectionHeading
-          eyebrow="კატეგორიები"
-          title="იპოვე ის, რაც გჭირდება"
-          description="დაათვალიერე ჩვენი ყველაზე მოთხოვნადი კატეგორიები"
-          className="mb-6 sm:mb-8"
-        />
+        <div className="mb-6 sm:mb-8">
+          <p className="text-label font-semibold text-brand-600">კატეგორიები</p>
+          <h2 className="text-h2 mt-1 text-text">იპოვე ის, რაც გჭირდება</h2>
+        </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-6">
           {featuredCategories.map((category) => {
             const Icon = iconByVisual[category.visual];
             return (
               <Link
                 key={category.id}
                 href={category.href}
-                className="group flex items-center gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md sm:flex-col sm:items-start sm:gap-0 sm:p-5"
+                className="group flex flex-col items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-surface p-4 text-center shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md sm:p-5"
               >
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-brand-50 text-brand-700 transition-colors group-hover:bg-brand-600 group-hover:text-white sm:mb-4 sm:size-14">
-                  <Icon className="size-5 sm:size-7" strokeWidth={1.5} />
+                <span className="flex size-12 items-center justify-center rounded-[var(--radius-md)] bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-600 group-hover:text-white sm:size-14">
+                  <Icon className="size-6 sm:size-7" strokeWidth={1.5} />
                 </span>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-small truncate font-semibold text-text sm:text-body">
-                    {category.name}
-                  </h3>
+                <div className="min-w-0">
+                  <h3 className="text-small truncate font-semibold text-text sm:text-body">{category.name}</h3>
                   {category.productCount ? (
-                    <p className="tnum mt-0.5 truncate text-[0.75rem] text-text-faint sm:text-small">
+                    <p className="tnum mt-0.5 text-[0.75rem] text-text-faint sm:text-small">
                       {category.productCount}+ პროდუქტი
                     </p>
                   ) : null}

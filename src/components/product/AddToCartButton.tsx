@@ -5,6 +5,7 @@ import { ShoppingCart, Check } from "lucide-react";
 import type { Product } from "@/types/product";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/hooks/useCart";
+import { useMiniCart } from "@/hooks/useMiniCart";
 
 /**
  * Full-width add-to-cart control shared by every product surface (cards,
@@ -39,6 +40,7 @@ export function AddToCartButton({
   className?: string;
 }) {
   const { addItem } = useCart();
+  const { openWithItem } = useMiniCart();
   const [justAdded, setJustAdded] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const productName = product.name;
@@ -58,7 +60,8 @@ export function AddToCartButton({
       }
       onClick={() => {
         if (disabled) return;
-        addItem(product, quantity, variants);
+        const line = addItem(product, quantity, variants);
+        if (line) openWithItem(line);
         setJustAdded(true);
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         timeoutRef.current = setTimeout(() => setJustAdded(false), 1700);

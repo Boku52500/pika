@@ -13,7 +13,6 @@ export interface CategoryFilterState {
   storage: string[];
   ram: string[];
   availability: ProductAvailability[];
-  minRating: number | null;
   priceMin: number | null;
   priceMax: number | null;
 }
@@ -24,19 +23,17 @@ export const emptyFilters: CategoryFilterState = {
   storage: [],
   ram: [],
   availability: [],
-  minRating: null,
   priceMin: null,
   priceMax: null,
 };
 
-export type SortKey = "popularity" | "newest" | "price-asc" | "price-desc" | "rating";
+export type SortKey = "popularity" | "newest" | "price-asc" | "price-desc";
 
 export const sortOptions: { value: SortKey; label: string }[] = [
   { value: "popularity", label: "პოპულარობით" },
   { value: "newest", label: "ახალი დამატებული" },
   { value: "price-asc", label: "ფასი: იაფიდან ძვირისკენ" },
   { value: "price-desc", label: "ფასი: ძვირიდან იაფისკენ" },
-  { value: "rating", label: "მაღალი შეფასებით" },
 ];
 
 export function getPriceBounds(products: Product[]): { min: number; max: number } {
@@ -106,11 +103,18 @@ export function applyFilters(products: Product[], filters: CategoryFilterState):
     if (filters.storage.length && (!p.storage || !filters.storage.includes(p.storage))) return false;
     if (filters.ram.length && (!p.ram || !filters.ram.includes(p.ram))) return false;
     if (filters.availability.length && !filters.availability.includes(p.availability)) return false;
-    if (filters.minRating && p.rating < filters.minRating) return false;
     if (filters.priceMin != null && p.price < filters.priceMin) return false;
     if (filters.priceMax != null && p.price > filters.priceMax) return false;
     return true;
   });
+}
+
+function popularityScore(product: Product): number {
+  return (
+    Number(product.isNew) * 100 +
+    (product.badge ? 50 : 0) +
+    (product.previousPrice ? 10 : 0)
+  );
 }
 
 export function sortProducts(products: Product[], sort: SortKey): Product[] {
@@ -120,13 +124,11 @@ export function sortProducts(products: Product[], sort: SortKey): Product[] {
       return list.sort((a, b) => a.price - b.price);
     case "price-desc":
       return list.sort((a, b) => b.price - a.price);
-    case "rating":
-      return list.sort((a, b) => b.rating - a.rating);
     case "newest":
       return list.sort((a, b) => Number(b.isNew) - Number(a.isNew));
     case "popularity":
     default:
-      return list.sort((a, b) => b.reviewCount - a.reviewCount);
+      return list.sort((a, b) => popularityScore(b) - popularityScore(a) || a.name.localeCompare(b.name, "ka"));
   }
 }
 
@@ -137,7 +139,6 @@ export function countActiveFilters(filters: CategoryFilterState): number {
     filters.storage.length +
     filters.ram.length +
     filters.availability.length +
-    (filters.minRating ? 1 : 0) +
     (filters.priceMin != null ? 1 : 0) +
     (filters.priceMax != null ? 1 : 0)
   );

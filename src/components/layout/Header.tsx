@@ -14,7 +14,7 @@ import { MobileCategoryChips } from "./MobileCategoryChips";
 import { MobileMenu } from "./MobileMenu";
 import { TopUtilityBar } from "./TopUtilityBar";
 import { HeaderAccountMenu } from "./HeaderAccountMenu";
-import { HeaderCartButton } from "@/components/cart/HeaderCartButton";
+import { HeaderCartArea } from "@/components/cart/HeaderCartArea";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { HEADER_SEARCH_STACK_CLASS } from "@/lib/headerStack";
 import { useWishlist } from "@/hooks/useWishlist";
@@ -87,7 +87,7 @@ export function Header({
               <IconLink href="/account/wishlist" label="სურვილების სია" count={isClient ? wishlistCount : 0}>
                 <Heart className="size-[21px]" strokeWidth={1.75} />
               </IconLink>
-              <HeaderCartButton />
+              <HeaderCartArea />
             </div>
           </div>
 

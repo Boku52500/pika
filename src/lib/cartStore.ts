@@ -97,8 +97,8 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-function addItem(product: Product, quantity = 1, variants?: Record<string, string>) {
-  if (quantity <= 0 || !product?.id || !product.slug || !product.name || !product.brand) return;
+function addItem(product: Product, quantity = 1, variants?: Record<string, string>): CartLineItem | null {
+  if (quantity <= 0 || !product?.id || !product.slug || !product.name || !product.brand) return null;
   const mapped = cartSnapshotFromProduct(product, variants);
   const id = buildLineId(mapped.productId, mapped.variants);
   const current = getSnapshot();
@@ -112,23 +112,22 @@ function addItem(product: Product, quantity = 1, variants?: Record<string, strin
       quantity: clampQuantity(existing.quantity + quantity),
     };
     writeStorage(next);
-    return;
+    return next[existingIndex];
   }
 
-  if (current.length >= MAX_CART_LINES) return;
+  if (current.length >= MAX_CART_LINES) return null;
 
-  writeStorage([
-    ...current,
-    {
-      id,
-      productId: mapped.productId,
-      quantity: clampQuantity(quantity),
-      variants: mapped.variants,
-      variantLabels: mapped.variantLabels,
-      snapshot: mapped.snapshot,
-      addedAt: Date.now(),
-    },
-  ]);
+  const line: CartLineItem = {
+    id,
+    productId: mapped.productId,
+    quantity: clampQuantity(quantity),
+    variants: mapped.variants,
+    variantLabels: mapped.variantLabels,
+    snapshot: mapped.snapshot,
+    addedAt: Date.now(),
+  };
+  writeStorage([...current, line]);
+  return line;
 }
 
 function setQuantity(lineId: string, quantity: number) {

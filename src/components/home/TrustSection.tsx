@@ -5,49 +5,50 @@ const benefits = [
   {
     icon: BadgeCheck,
     title: "ოფიციალური პროდუქცია",
-    description: "მხოლოდ სერტიფიცირებული ბრენდები და ავტორიზებული მომწოდებლები",
+    description: "სერტიფიცირებული ბრენდები და ავტორიზებული მომწოდებლები",
   },
   {
     icon: ShieldCheck,
     title: "გარანტია",
-    description: "ყველა პროდუქტზე ვრცელდება ოფიციალური საგარანტიო მომსახურება",
+    description: "ოფიციალური საგარანტიო მომსახურება",
   },
   {
     icon: Truck,
-    title: "სწრაფი მიწოდება",
-    description: "თბილისში — 1 დღეში, რეგიონებში — 1-დან 3 დღემდე",
+    title: "მიწოდება",
+    description: "თბილისში და რეგიონებში — მოკლე ვადებით",
   },
   {
     icon: Lock,
     title: "უსაფრთხო გადახდა",
-    description: "ბარათით, გადმოზიდვისას ან განვადებით, საკომისიოს გარეშე",
+    description: "ბარათით, გადმოზიდვისას ან განვადებით",
   },
   {
     icon: RotateCcw,
-    title: "მარტივი დაბრუნება",
-    description: "დაბრუნება და გაცვლა შეძენიდან 14 დღის განმავლობაში",
+    title: "დაბრუნება",
+    description: "დაბრუნება და გაცვლა 14 დღის განმავლობაში",
   },
   {
     icon: Headset,
-    title: "მომხმარებელთა მხარდაჭერა",
-    description: "დაგვიკავშირდი ნებისმიერ დღეს — პასუხს გცემთ სწრაფად",
+    title: "მხარდაჭერა",
+    description: "დაგვიკავშირდით — პასუხს გცემთ სწრაფად",
   },
 ];
 
 export function TrustSection() {
   return (
-    <section className="border-y border-border bg-surface-2 py-10 sm:py-14">
+    <section className="border-y border-border bg-surface-2/50 py-10 sm:py-12">
       <Container>
-        <div className="grid grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
           {benefits.map(({ icon: Icon, title, description }) => (
-            <div key={title} className="flex items-start gap-4">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-white text-brand-600 shadow-xs">
-                <Icon className="size-[22px]" strokeWidth={1.6} />
+            <div
+              key={title}
+              className="flex flex-col items-center rounded-[var(--radius-lg)] border border-border bg-surface px-3 py-5 text-center shadow-xs sm:px-4"
+            >
+              <span className="mb-3 flex size-11 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                <Icon className="size-5" strokeWidth={1.75} />
               </span>
-              <div>
-                <h3 className="text-body font-semibold text-text">{title}</h3>
-                <p className="text-small mt-1 text-text-muted">{description}</p>
-              </div>
+              <h3 className="text-small font-semibold text-text">{title}</h3>
+              <p className="text-label mt-1 text-text-muted">{description}</p>
             </div>
           ))}
         </div>

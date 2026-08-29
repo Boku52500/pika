@@ -20,6 +20,7 @@ export type CategoryNavNode = {
 
 export type MainNavItem = {
   id: string;
+  slug: string;
   name: string;
   href: string;
   highlight: boolean;
@@ -66,6 +67,7 @@ export function selectMainNavItems(rows: CategoryNavFlat[]): MainNavItem[] {
     .sort((a, b) => a.navSortOrder - b.navSortOrder || a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "ka"))
     .map((row) => ({
       id: row.id,
+      slug: row.slug,
       name: row.name,
       href: categoryHref(row.slug),
       highlight: row.slug === "deals",

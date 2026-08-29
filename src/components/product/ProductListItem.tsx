@@ -7,17 +7,11 @@ import { cn, getDiscountPercent } from "@/lib/utils";
 import { availabilityLabel } from "@/lib/productLabels";
 import { getDefaultVariants } from "@/lib/cart";
 import { ProductImage } from "./ProductImage";
-import { ProductRating } from "./ProductRating";
 import { ProductPrice } from "./ProductPrice";
 import { WishlistButton } from "./WishlistButton";
 import { AddToCartButton } from "./AddToCartButton";
 import { DiscountBadge } from "./ProductBadge";
 
-/**
- * Horizontal row variant of ProductCard used by the category page's "list"
- * view. Shares every atom (image, rating, price, wishlist, add-to-cart) with
- * the grid card so both views always stay visually consistent.
- */
 export function ProductListItem({ product, className }: { product: Product; className?: string }) {
   const router = useRouter();
   const discount = getDiscountPercent(product.price, product.previousPrice);
@@ -28,7 +22,7 @@ export function ProductListItem({ product, className }: { product: Product; clas
   return (
     <div
       className={cn(
-        "group flex flex-col gap-4 overflow-hidden rounded-[var(--radius-md)] border border-border bg-surface p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md sm:flex-row sm:items-stretch sm:gap-5 sm:p-4",
+        "group flex flex-col gap-4 overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface p-3 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md sm:flex-row sm:items-stretch sm:gap-5 sm:p-4",
         className
       )}
     >
@@ -38,7 +32,7 @@ export function ProductListItem({ product, className }: { product: Product; clas
             visual={product.visual}
             tone={product.tone}
             hoverVisual={product.secondaryVisual}
-            className="transition-transform duration-300 group-hover:scale-[1.03]"
+            className="rounded-[var(--radius-md)] bg-surface-2/40 transition-transform duration-300 group-hover:scale-[1.02]"
           />
         </Link>
 
@@ -49,7 +43,7 @@ export function ProductListItem({ product, className }: { product: Product; clas
         <WishlistButton product={product} className="absolute right-3 top-3" />
 
         {outOfStock ? (
-          <div className="pointer-events-none absolute inset-2 flex items-center justify-center rounded-[var(--radius-md)] bg-white/70 backdrop-saturate-150">
+          <div className="pointer-events-none absolute inset-2 flex items-center justify-center rounded-[var(--radius-md)] bg-white/75 backdrop-saturate-150">
             <span className="text-label rounded-[var(--radius-xs)] bg-ink-900 px-2.5 py-1 text-white">
               არ არის მარაგში
             </span>
@@ -61,8 +55,9 @@ export function ProductListItem({ product, className }: { product: Product; clas
         <Link href={href} onMouseEnter={prefetch} onFocus={prefetch} className="flex flex-col gap-1.5">
           <span className="text-label text-text-faint">{product.brand}</span>
           <h3 className="text-body font-semibold leading-snug text-text">{product.name}</h3>
-          <ProductRating rating={product.rating} reviewCount={product.reviewCount} />
         </Link>
+
+        <ProductPrice price={product.price} previousPrice={product.previousPrice} installment={product.installment} />
 
         <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
           <span
@@ -87,11 +82,6 @@ export function ProductListItem({ product, className }: { product: Product; clas
       </div>
 
       <div className="flex shrink-0 flex-row items-end justify-between gap-3 border-t border-border pt-3 sm:w-52 sm:flex-col sm:items-stretch sm:justify-start sm:border-t-0 sm:border-l sm:pl-5 sm:pt-1">
-        <ProductPrice
-          price={product.price}
-          previousPrice={product.previousPrice}
-          installment={product.installment}
-        />
         <AddToCartButton
           product={product}
           variants={getDefaultVariants(product)}

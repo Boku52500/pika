@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Star } from "lucide-react";
 import type { Product, ProductAvailability } from "@/types/product";
 import { cn } from "@/lib/utils";
 import { availabilityLabel } from "@/lib/productLabels";
@@ -14,7 +13,6 @@ import {
 } from "./filters";
 
 const availabilityOptions: ProductAvailability[] = ["in-stock", "low-stock", "out-of-stock"];
-const ratingOptions = [4.5, 4, 3];
 
 function toggleValue<T extends string>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -22,8 +20,8 @@ function toggleValue<T extends string>(list: T[], value: T): T[] {
 
 function FilterSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="border-b border-border py-5 first:pt-0 last:border-b-0">
-      <h3 className="text-label mb-3 text-text-muted">{title}</h3>
+    <div className="border-b border-border py-4 first:pt-0 last:border-b-0">
+      <h3 className="text-label mb-2.5 font-semibold text-text">{title}</h3>
       {children}
     </div>
   );
@@ -95,7 +93,7 @@ export function FilterSidebar({
   };
 
   return (
-    <div className={cn("flex flex-col", className)}>
+    <div className={cn("flex flex-col rounded-[var(--radius-lg)] border border-border bg-surface p-4 shadow-xs", className)}>
       <div className="mb-1 flex items-center justify-between">
         {showHeading ? <h2 className="text-h3 text-text">ფილტრი</h2> : <span />}
         <button
@@ -197,36 +195,6 @@ export function FilterSidebar({
           ))}
         </FilterSection>
       ) : null}
-
-      <FilterSection title="შეფასება">
-        <div className="flex flex-col gap-1">
-          {ratingOptions.map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => onChange({ minRating: filters.minRating === r ? null : r })}
-              className={cn(
-                "flex items-center gap-1.5 rounded-[var(--radius-sm)] px-1.5 py-1.5 text-small transition-colors",
-                filters.minRating === r ? "bg-brand-50 font-medium text-brand-700" : "text-text hover:bg-surface-2"
-              )}
-            >
-              <span className="flex items-center gap-0.5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={cn(
-                      "size-3.5",
-                      i < Math.round(r) ? "fill-accent-400 text-accent-400" : "fill-none text-border-strong"
-                    )}
-                    strokeWidth={1.5}
-                  />
-                ))}
-              </span>
-              {r} და მეტი
-            </button>
-          ))}
-        </div>
-      </FilterSection>
 
       <FilterSection title="ხელმისაწვდომობა">
         {availabilityOptions.map((value) => (

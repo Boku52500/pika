@@ -2,16 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { heroSlides } from "@/data/heroSlides";
 import { iconByVisual } from "@/components/product/ProductImage";
 import { wrapCarouselIndex, trackScrollLeftForSlide } from "@/lib/heroCarousel";
 import { cn } from "@/lib/utils";
 
 /**
- * Minimal, image-forward promotional carousel: one primary slide plus a
- * peek of the next, arrow controls and dot pagination. Swap `heroSlides`
- * data to change campaigns.
+ * Premium promotional carousel — white cards, purple accents, preserved scroll/snap behavior.
  */
 export function HeroCarousel() {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -54,7 +52,7 @@ export function HeroCarousel() {
     <div className="relative">
       <div
         ref={trackRef}
-        className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth"
+        className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-1"
       >
         {heroSlides.map((slide, index) => {
           const Icon = iconByVisual[slide.visual];
@@ -68,31 +66,35 @@ export function HeroCarousel() {
             >
               <Link
                 href={slide.href}
-                className={cn(
-                  "group relative flex h-[240px] items-center overflow-hidden rounded-[var(--radius-xl)] sm:h-[280px] lg:h-[320px]",
-                  slide.bg
-                )}
+                className="group relative flex h-[260px] items-stretch overflow-hidden rounded-[var(--radius-xl)] border border-border bg-surface shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md sm:h-[300px] lg:h-[340px]"
               >
-                <Icon
-                  aria-hidden
-                  className="pointer-events-none absolute -right-6 top-1/2 h-[85%] w-[85%] -translate-y-1/2 text-white/[0.08] transition-transform duration-500 group-hover:scale-105 sm:h-[75%] sm:w-[75%]"
-                  strokeWidth={1}
-                />
-
-                {slide.ribbon ? (
-                  <span className="absolute right-5 top-5 rounded-full bg-white px-3 py-1 text-[0.8125rem] font-bold text-ink-900">
-                    {slide.ribbon}
-                  </span>
-                ) : null}
-
-                <div className="relative flex w-[76%] flex-col gap-2 p-5 sm:w-[62%] sm:p-8">
-                  <span className="text-label tracking-[0.08em] text-white/60">
+                <div className="relative z-10 flex min-w-0 flex-1 flex-col justify-center gap-3 p-5 sm:p-7 lg:p-8">
+                  {slide.ribbon ? (
+                    <span className="inline-flex w-fit rounded-full bg-brand-50 px-3 py-1 text-[0.8125rem] font-bold text-brand-700">
+                      {slide.ribbon}
+                    </span>
+                  ) : null}
+                  <span className="text-label font-semibold tracking-[0.06em] text-brand-600">
                     {slide.brand}
                   </span>
-                  <h3 className="text-lg font-extrabold leading-snug text-white sm:text-2xl lg:text-[1.75rem]">
+                  <h3 className="text-xl font-extrabold leading-tight text-text sm:text-2xl lg:text-[1.875rem]">
                     {slide.title}
                   </h3>
-                  <p className="text-small text-white/70">{slide.description}</p>
+                  <p className="text-small max-w-sm text-text-muted sm:text-body">{slide.description}</p>
+                  <span className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-[var(--radius-md)] bg-brand-600 px-4 py-2.5 text-small font-semibold text-white transition-colors group-hover:bg-brand-700">
+                    იხილე მეტი
+                    <ArrowRight className="size-4" strokeWidth={2.25} />
+                  </span>
+                </div>
+
+                <div
+                  aria-hidden
+                  className="relative hidden w-[42%] shrink-0 items-center justify-center bg-gradient-to-br from-brand-50 to-surface-2 sm:flex"
+                >
+                  <Icon
+                    className="size-[min(12rem,70%)] text-brand-600/15 transition-transform duration-500 group-hover:scale-105"
+                    strokeWidth={0.75}
+                  />
                 </div>
               </Link>
             </div>
@@ -104,7 +106,7 @@ export function HeroCarousel() {
         type="button"
         aria-label="წინა სლაიდი"
         onClick={() => goTo(active - 1)}
-        className="absolute left-2 top-1/2 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-ink-800 shadow-md transition-transform hover:scale-105 sm:flex"
+        className="absolute left-2 top-1/2 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-surface text-ink-800 shadow-md transition-transform hover:scale-105 sm:flex"
       >
         <ChevronLeft className="size-5" strokeWidth={2.25} />
       </button>
@@ -112,7 +114,7 @@ export function HeroCarousel() {
         type="button"
         aria-label="შემდეგი სლაიდი"
         onClick={() => goTo(active + 1)}
-        className="absolute right-2 top-1/2 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-ink-800 shadow-md transition-transform hover:scale-105 sm:flex"
+        className="absolute right-2 top-1/2 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-surface text-ink-800 shadow-md transition-transform hover:scale-105 sm:flex"
       >
         <ChevronRight className="size-5" strokeWidth={2.25} />
       </button>
@@ -127,7 +129,7 @@ export function HeroCarousel() {
             onClick={() => goTo(index)}
             className={cn(
               "h-1.5 rounded-full transition-all duration-200",
-              index === active ? "w-6 bg-ink-900" : "w-1.5 bg-ink-900/20 hover:bg-ink-900/35"
+              index === active ? "w-6 bg-brand-600" : "w-1.5 bg-brand-600/20 hover:bg-brand-600/35"
             )}
           />
         ))}

@@ -59,22 +59,26 @@ export function CategoryPageClient({ category, products }: { category: Category;
   return (
     <div className="py-6 sm:py-8">
       <Container>
-        <Breadcrumbs items={[{ label: category.name }]} className="mb-4" />
+        <Breadcrumbs items={[{ label: category.name }]} className="mb-5" />
 
-        <div className="mb-6 max-w-2xl sm:mb-8">
-          <h1 className="text-h2 text-text">{category.name}</h1>
-          {category.description ? (
-            <p className="text-body mt-2 text-text-muted">{category.description}</p>
-          ) : null}
-          <p className="text-small tnum mt-2 text-text-faint">{products.length} პროდუქტი კატეგორიაში</p>
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4 sm:mb-8">
+          <div className="max-w-2xl">
+            <h1 className="text-h2 text-text">{category.name}</h1>
+            {category.description ? (
+              <p className="text-body mt-2 text-text-muted">{category.description}</p>
+            ) : null}
+          </div>
+          <p className="text-small tnum rounded-full border border-border bg-surface px-3 py-1.5 font-medium text-text-muted">
+            {products.length} პროდუქტი
+          </p>
         </div>
 
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-border bg-surface px-3 py-3 sm:px-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="text-small relative inline-flex h-10 items-center gap-2 rounded-[var(--radius-sm)] border border-border-strong px-3.5 font-medium text-text transition-colors hover:border-border lg:hidden"
+              className="text-small relative inline-flex h-10 items-center gap-2 rounded-[var(--radius-md)] border border-border bg-surface px-3.5 font-medium text-text transition-colors hover:border-brand-200 hover:bg-brand-50 lg:hidden"
             >
               <SlidersHorizontal className="size-4" strokeWidth={2.25} />
               ფილტრი

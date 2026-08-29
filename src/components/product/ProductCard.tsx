@@ -7,7 +7,6 @@ import { cn, getDiscountPercent } from "@/lib/utils";
 import { availabilityLabel } from "@/lib/productLabels";
 import { getDefaultVariants } from "@/lib/cart";
 import { ProductImage } from "./ProductImage";
-import { ProductRating } from "./ProductRating";
 import { ProductPrice } from "./ProductPrice";
 import { WishlistButton } from "./WishlistButton";
 import { AddToCartButton } from "./AddToCartButton";
@@ -31,17 +30,11 @@ export function ProductCard({
   return (
     <div
       className={cn(
-        "group flex h-full w-full flex-col overflow-hidden rounded-[var(--radius-md)] border border-border bg-surface transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md",
+        "group flex h-full w-full flex-col overflow-hidden rounded-[var(--radius-lg)] border border-border bg-surface shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md",
         className
       )}
     >
-      <div className="relative p-3 pb-0">
-        {/*
-          The image link is hidden from keyboard/screen-reader navigation
-          (tabIndex -1, aria-hidden) because the title link below points to
-          the same destination — this avoids two identical tab stops per
-          card while mouse users can still click the photo.
-        */}
+      <div className="relative bg-surface-2/40 p-3 pb-0">
         <Link href={href} prefetch={false} tabIndex={-1} aria-hidden className="block">
           <ProductImage
             visual={product.visual}
@@ -50,7 +43,7 @@ export function ProductCard({
             src={primaryPhoto?.src}
             alt={primaryPhoto?.alt || product.name}
             hoverSrc={hoverPhoto?.src}
-            className="transition-transform duration-300 group-hover:scale-[1.03]"
+            className="rounded-[var(--radius-md)] bg-white transition-transform duration-300 group-hover:scale-[1.02]"
           />
         </Link>
 
@@ -61,7 +54,7 @@ export function ProductCard({
         <WishlistButton product={product} className="absolute right-4 top-4" />
 
         {outOfStock ? (
-          <div className="pointer-events-none absolute inset-3 flex items-center justify-center rounded-[var(--radius-md)] bg-white/70 backdrop-saturate-150">
+          <div className="pointer-events-none absolute inset-3 flex items-center justify-center rounded-[var(--radius-md)] bg-white/75 backdrop-saturate-150">
             <span className="text-label rounded-[var(--radius-xs)] bg-ink-900 px-2.5 py-1 text-white">
               არ არის მარაგში
             </span>
@@ -73,14 +66,12 @@ export function ProductCard({
         href={href}
         onMouseEnter={prefetch}
         onFocus={prefetch}
-        className="flex flex-col gap-1.5 p-4 pb-0 pt-3"
+        className="flex flex-col gap-1.5 px-4 pb-0 pt-3"
       >
         <span className="text-label text-text-faint">{product.brand}</span>
         <h3 className="text-body line-clamp-2 min-h-[2.75rem] font-semibold leading-snug text-text">
           {product.name}
         </h3>
-
-        <ProductRating rating={product.rating} reviewCount={product.reviewCount} />
 
         <ProductPrice
           price={product.price}

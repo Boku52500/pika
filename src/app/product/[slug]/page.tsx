@@ -10,7 +10,6 @@ import { ProductDeliverySummary } from "@/components/product/ProductDeliverySumm
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
 import { ProductKeyFeatures } from "@/components/product/ProductKeyFeatures";
 import { ProductSpecs } from "@/components/product/ProductSpecs";
-import { ProductReviews } from "@/components/product/ProductReviews";
 import { ProductRecommendations } from "@/components/product/ProductRecommendations";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { getAppOriginString } from "@/lib/appUrl";
@@ -23,8 +22,6 @@ import {
   getGalleryImages,
   getInstallmentOptions,
   getKeyFeatures,
-  getRatingBreakdown,
-  getReviews,
   getSku,
   getSpecGroups,
   getVariantGroups,
@@ -78,8 +75,6 @@ export default async function ProductPage({
   const keyFeatures = getKeyFeatures(product);
   const specGroups = getSpecGroups(product);
   const variantGroups = getVariantGroups(product);
-  const reviews = getReviews(product);
-  const ratingBreakdown = getRatingBreakdown(product);
   const outOfStock = product.availability === "out-of-stock";
   const origin = getAppOriginString();
   const imageUrls = images.map((image) => image.src).filter((src): src is string => Boolean(src));
@@ -114,7 +109,6 @@ export default async function ProductPage({
     { id: "description", label: "აღწერა", show: true },
     { id: "whats-included", label: "კომპლექტაცია", show: whatsIncluded.length > 0 },
     { id: "warranty-delivery", label: "გარანტია და მიწოდება", show: true },
-    { id: "reviews", label: "შეფასებები", show: true },
   ].filter((section) => section.show);
 
   return (
@@ -219,11 +213,6 @@ export default async function ProductPage({
               </div>
             </div>
           </div>
-        </section>
-
-        <section id="reviews" className="scroll-mt-32">
-          <h2 className="text-h3 mb-5 text-text">შეფასებები</h2>
-          <ProductReviews product={product} reviews={reviews} breakdown={ratingBreakdown} />
         </section>
       </Container>
 
