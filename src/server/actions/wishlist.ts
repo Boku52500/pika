@@ -37,7 +37,7 @@ export async function mergeWishlist(productIds: string[]): Promise<ActionResult<
 
   try {
     const existing = await prisma.product.findMany({
-      where: { id: { in: unique }, isActive: true },
+      where: { id: { in: unique }, isActive: true, deletedAt: null },
       select: { id: true },
     });
     const validIds = existing.map((row) => row.id);
@@ -70,7 +70,7 @@ export async function toggleWishlistItem(productId: string): Promise<ActionResul
     }
 
     const product = await prisma.product.findFirst({
-      where: { id: productId, isActive: true },
+      where: { id: productId, isActive: true, deletedAt: null },
       select: { id: true },
     });
     if (!product) return { ok: false, message: "პროდუქტი ვერ მოიძებნა" };

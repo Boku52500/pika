@@ -8,7 +8,7 @@ import { ProductRating } from "./ProductRating";
 import { ProductPrice } from "./ProductPrice";
 import { WishlistButton } from "./WishlistButton";
 import { AddToCartButton } from "./AddToCartButton";
-import { ProductBadge, DiscountBadge, NewBadge } from "./ProductBadge";
+import { DiscountBadge } from "./ProductBadge";
 
 export function ProductCard({
   product,
@@ -51,8 +51,6 @@ export function ProductCard({
 
         <div className="pointer-events-none absolute left-4 top-4 flex flex-col items-start gap-1.5">
           {discount ? <DiscountBadge percent={discount} /> : null}
-          {product.isNew ? <NewBadge /> : null}
-          {product.badge ? <ProductBadge badge={product.badge} /> : null}
         </div>
 
         <WishlistButton product={product} className="absolute right-4 top-4" />

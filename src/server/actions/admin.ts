@@ -15,10 +15,24 @@ import {
   adminProductImageReorderSchema,
   adminProductSaveSchema,
   adminPromotionSaveSchema,
+  adminSpecificationCreateSchema,
+  adminSpecificationRenameSchema,
+  adminSpecificationValueCreateSchema,
+  adminVariantOptionCreateSchema,
 } from "@/server/validation/admin";
 import { parseMoneyInput } from "@/server/money";
 import { stockStateFromQuantity } from "@/server/admin/stock";
 import { categoryWouldCycle } from "@/server/admin/categories";
+import { productArchiveData, productRestoreData } from "@/server/admin/productArchive";
+import { createReusableVariantOption } from "@/server/admin/variantOptions";
+import {
+  deleteUnusedSpecificationDefinition,
+  deleteUnusedSpecificationValue,
+  findOrCreateSpecificationDefinition,
+  findOrCreateSpecificationValue,
+  renameSpecificationDefinition,
+  renameSpecificationValue,
+} from "@/server/admin/specifications";
 import { revalidateCatalogue, revalidateOrders, revalidatePromotions } from "@/server/admin/revalidate";
 import { scheduleEmail } from "@/server/email/schedule";
 import { notifyOrderStatus } from "@/server/email/notify";
@@ -278,28 +292,47 @@ export async function saveAdminProduct(input: unknown): Promise<ActionResult<{ i
         }
       }
 
-      await tx.productSpecification.deleteMany({
-        where: {
-          productId: product.id,
-          specificationId: { notIn: data.specifications.filter((row) => row.value.trim()).map((row) => row.specificationId) },
-        },
-      });
-
+      const resolvedSpecIds: string[] = [];
       for (const spec of data.specifications) {
         const value = spec.value.trim();
-        if (!value) continue;
+        const named = spec.specificationName?.trim() ?? "";
+        let specificationId = spec.specificationId?.trim() ?? "";
+        if (!specificationId && named) {
+          specificationId = (await findOrCreateSpecificationDefinition(tx, named)).id;
+        }
+        if (!specificationId || !value) continue;
+        const definition = await tx.specificationDefinition.findUnique({
+          where: { id: specificationId },
+          select: { id: true },
+        });
+        if (!definition) continue;
+        const library = await findOrCreateSpecificationValue(tx, specificationId, value);
+        resolvedSpecIds.push(specificationId);
         await tx.productSpecification.upsert({
           where: {
-            productId_specificationId: { productId: product.id, specificationId: spec.specificationId },
+            productId_specificationId: { productId: product.id, specificationId },
           },
           create: {
             productId: product.id,
-            specificationId: spec.specificationId,
-            value,
-            numericValue: specNumeric(value),
+            specificationId,
+            value: library.name,
+            valueId: library.id,
+            numericValue: specNumeric(library.name),
           },
-          update: { value, numericValue: specNumeric(value) },
+          update: {
+            value: library.name,
+            valueId: library.id,
+            numericValue: specNumeric(library.name),
+          },
         });
+      }
+
+      if (resolvedSpecIds.length) {
+        await tx.productSpecification.deleteMany({
+          where: { productId: product.id, specificationId: { notIn: resolvedSpecIds } },
+        });
+      } else {
+        await tx.productSpecification.deleteMany({ where: { productId: product.id } });
       }
 
       return {
@@ -321,6 +354,9 @@ export async function saveAdminProduct(input: unknown): Promise<ActionResult<{ i
   } catch (error) {
     if (error instanceof Error && error.message === "INVALID_VARIANT_OPTION") {
       return { ok: false, message: "არჩეული ვარიანტის მნიშვნელობა არასწორია" };
+    }
+    if (error instanceof Error && (error.message === "INVALID_SPEC_NAME" || error.message === "INVALID_SPEC_VALUE")) {
+      return { ok: false, message: "სპეციფიკაციის დასახელება ან მნიშვნელობა არასწორია" };
     }
     const unique = uniqueMessage(error);
     if (unique) return { ok: false, message: unique };
@@ -344,6 +380,206 @@ export async function deactivateAdminProduct(input: unknown): Promise<ActionResu
   await prisma.product.update({ where: { id: product.id }, data: { isActive: false } });
   revalidateCatalogue({ productSlug: product.slug });
   return { ok: true };
+}
+
+export async function archiveAdminProduct(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminIdSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "პროდუქტი ვერ მოიძებნა" };
+
+  const product = await prisma.product.findUnique({
+    where: { id: parsed.data.id },
+    select: { id: true, slug: true, deletedAt: true },
+  });
+  if (!product) return { ok: false, message: "პროდუქტი ვერ მოიძებნა" };
+  if (product.deletedAt) return { ok: true };
+
+  await prisma.product.update({
+    where: { id: product.id },
+    data: productArchiveData(),
+  });
+  revalidateCatalogue({ productSlug: product.slug });
+  return { ok: true };
+}
+
+export async function restoreAdminProduct(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminIdSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "პროდუქტი ვერ მოიძებნა" };
+
+  const product = await prisma.product.findUnique({
+    where: { id: parsed.data.id },
+    select: { id: true, slug: true },
+  });
+  if (!product) return { ok: false, message: "პროდუქტი ვერ მოიძებნა" };
+
+  await prisma.product.update({
+    where: { id: product.id },
+    data: productRestoreData(),
+  });
+  revalidateCatalogue({ productSlug: product.slug });
+  return { ok: true };
+}
+
+export async function createAdminVariantOption(
+  input: unknown,
+): Promise<ActionResult<{ id: string; name: string; slug: string }>> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminVariantOptionCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    const { message } = firstZodMessage(parsed.error);
+    return { ok: false, message };
+  }
+  try {
+    const option = await createReusableVariantOption(parsed.data.attributeId, parsed.data.name);
+    revalidateCatalogue();
+    return { ok: true, data: option };
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return { ok: false, message: "ატრიბუტი ვერ მოიძებნა" };
+    }
+    if (error instanceof Error && error.message === "INVALID_OPTION_NAME") {
+      return { ok: false, message: "შეიყვანეთ ფერის დასახელება" };
+    }
+    logError("admin.create_variant_option_failed", { error });
+    return { ok: false, message: GENERIC_SERVER_ERROR };
+  }
+}
+
+export async function createAdminSpecification(
+  input: unknown,
+): Promise<ActionResult<{ id: string; name: string }>> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminSpecificationCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    const { message } = firstZodMessage(parsed.error);
+    return { ok: false, message };
+  }
+  try {
+    const created = await prisma.$transaction((tx) => findOrCreateSpecificationDefinition(tx, parsed.data.name));
+    revalidateCatalogue();
+    return { ok: true, data: created };
+  } catch (error) {
+    if (error instanceof Error && error.message === "INVALID_SPEC_NAME") {
+      return { ok: false, message: "შეიყვანეთ სპეციფიკაციის დასახელება" };
+    }
+    logError("admin.create_specification_failed", { error });
+    return { ok: false, message: GENERIC_SERVER_ERROR };
+  }
+}
+
+export async function createAdminSpecificationValue(
+  input: unknown,
+): Promise<ActionResult<{ id: string; name: string }>> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminSpecificationValueCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    const { message } = firstZodMessage(parsed.error);
+    return { ok: false, message };
+  }
+  try {
+    const definition = await prisma.specificationDefinition.findUnique({
+      where: { id: parsed.data.specificationId },
+      select: { id: true },
+    });
+    if (!definition) return { ok: false, message: "სპეციფიკაცია ვერ მოიძებნა" };
+    const created = await prisma.$transaction((tx) =>
+      findOrCreateSpecificationValue(tx, parsed.data.specificationId, parsed.data.name),
+    );
+    revalidateCatalogue();
+    return { ok: true, data: created };
+  } catch (error) {
+    if (error instanceof Error && error.message === "INVALID_SPEC_VALUE") {
+      return { ok: false, message: "შეიყვანეთ მნიშვნელობა" };
+    }
+    logError("admin.create_specification_value_failed", { error });
+    return { ok: false, message: GENERIC_SERVER_ERROR };
+  }
+}
+
+export async function renameAdminSpecification(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminSpecificationRenameSchema.safeParse(input);
+  if (!parsed.success) {
+    const { message } = firstZodMessage(parsed.error);
+    return { ok: false, message };
+  }
+  try {
+    await renameSpecificationDefinition(parsed.data.id, parsed.data.name);
+    revalidateCatalogue();
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") return { ok: false, message: "სპეციფიკაცია ვერ მოიძებნა" };
+    if (error instanceof Error && error.message === "DUPLICATE") return { ok: false, message: "ასეთი სპეციფიკაცია უკვე არსებობს" };
+    if (error instanceof Error && error.message === "INVALID_SPEC_NAME") return { ok: false, message: "შეიყვანეთ დასახელება" };
+    logError("admin.rename_specification_failed", { error });
+    return { ok: false, message: GENERIC_SERVER_ERROR };
+  }
+}
+
+export async function renameAdminSpecificationValue(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminSpecificationRenameSchema.safeParse(input);
+  if (!parsed.success) {
+    const { message } = firstZodMessage(parsed.error);
+    return { ok: false, message };
+  }
+  try {
+    await renameSpecificationValue(parsed.data.id, parsed.data.name);
+    revalidateCatalogue();
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") return { ok: false, message: "მნიშვნელობა ვერ მოიძებნა" };
+    if (error instanceof Error && error.message === "DUPLICATE") return { ok: false, message: "ასეთი მნიშვნელობა უკვე არსებობს" };
+    if (error instanceof Error && error.message === "INVALID_SPEC_VALUE") return { ok: false, message: "შეიყვანეთ მნიშვნელობა" };
+    logError("admin.rename_specification_value_failed", { error });
+    return { ok: false, message: GENERIC_SERVER_ERROR };
+  }
+}
+
+export async function deleteAdminSpecificationValue(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminIdSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "მნიშვნელობა ვერ მოიძებნა" };
+  try {
+    await deleteUnusedSpecificationValue(parsed.data.id);
+    revalidateCatalogue();
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") return { ok: false, message: "მნიშვნელობა ვერ მოიძებნა" };
+    if (error instanceof Error && error.message === "IN_USE") {
+      return { ok: false, message: "მნიშვნელობა გამოიყენება პროდუქტზე და ვერ წაიშლება" };
+    }
+    logError("admin.delete_specification_value_failed", { error });
+    return { ok: false, message: GENERIC_SERVER_ERROR };
+  }
+}
+
+export async function deleteAdminSpecification(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminIdSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "სპეციფიკაცია ვერ მოიძებნა" };
+  try {
+    await deleteUnusedSpecificationDefinition(parsed.data.id);
+    revalidateCatalogue();
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") return { ok: false, message: "სპეციფიკაცია ვერ მოიძებნა" };
+    if (error instanceof Error && error.message === "IN_USE") {
+      return { ok: false, message: "სპეციფიკაცია გამოიყენება პროდუქტზე და ვერ წაიშლება" };
+    }
+    logError("admin.delete_specification_failed", { error });
+    return { ok: false, message: GENERIC_SERVER_ERROR };
+  }
 }
 
 export async function saveAdminCategory(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -420,6 +656,8 @@ export async function saveAdminCategory(input: unknown): Promise<ActionResult<{ 
         sortOrder: data.sortOrder,
         isActive: data.isActive,
         indexable: data.indexable,
+        showInMainNav: data.showInMainNav,
+        navSortOrder: data.navSortOrder,
       };
       const category = data.id
         ? await tx.category.update({ where: { id: data.id }, data: payload })
@@ -451,6 +689,30 @@ export async function setAdminCategoryActive(input: unknown): Promise<ActionResu
   });
   if (!category) return { ok: false, message: "კატეგორია ვერ მოიძებნა" };
   await prisma.category.update({ where: { id: category.id }, data: { isActive: parsed.data.isActive } });
+  revalidateCatalogue({ categorySlug: category.slug });
+  return { ok: true };
+}
+
+export async function setAdminCategoryMainNav(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminIdSchema.extend({ showInMainNav: adminCategorySaveSchema.shape.showInMainNav }).safeParse({
+    ...(typeof input === "object" && input ? input : {}),
+  });
+  if (!parsed.success) return { ok: false, message: "კატეგორია ვერ მოიძებნა" };
+
+  const category = await prisma.category.findUnique({
+    where: { id: parsed.data.id },
+    select: { id: true, slug: true, sortOrder: true, navSortOrder: true },
+  });
+  if (!category) return { ok: false, message: "კატეგორია ვერ მოიძებნა" };
+  await prisma.category.update({
+    where: { id: category.id },
+    data: {
+      showInMainNav: parsed.data.showInMainNav,
+      ...(parsed.data.showInMainNav && category.navSortOrder === 0 ? { navSortOrder: category.sortOrder } : {}),
+    },
+  });
   revalidateCatalogue({ categorySlug: category.slug });
   return { ok: true };
 }

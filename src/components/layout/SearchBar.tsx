@@ -27,7 +27,7 @@ export function SearchBar({ className }: { className?: string }) {
   }, [open, setOpen]);
 
   return (
-    <div ref={containerRef} className={cn("group relative w-full", className)}>
+    <div ref={containerRef} className={cn("group relative w-full overflow-visible", className)}>
       <form
         role="search"
         onSubmit={(e) => {
@@ -53,8 +53,12 @@ export function SearchBar({ className }: { className?: string }) {
           aria-autocomplete="list"
           aria-activedescendant={panelVisible ? getActiveOptionId(idPrefix, activeIndex) : undefined}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
           onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder="მოძებნე პროდუქტი, ბრენდი ან კატეგორია"
           className="h-11 w-full rounded-[var(--radius-md)] border border-border-strong bg-surface-2 pl-11 pr-24 text-[0.9375rem] text-text placeholder:text-text-faint transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-100"
@@ -78,7 +82,7 @@ export function SearchBar({ className }: { className?: string }) {
       </form>
 
       {panelVisible ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 max-h-[28rem] overflow-y-auto rounded-[var(--radius-md)] border border-border bg-surface shadow-lg">
+        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[60] max-h-[28rem] overflow-y-auto rounded-[var(--radius-md)] border border-border bg-surface shadow-lg">
           <SearchResultsPanel box={box} idPrefix={idPrefix} listboxId={listboxId} />
         </div>
       ) : null}

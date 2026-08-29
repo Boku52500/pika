@@ -226,7 +226,7 @@ export async function createOrder(
     const placed = await prisma.$transaction(async (tx) => {
       const productIds = [...new Set(payload.items.map((item) => item.productId))];
       const products = await tx.product.findMany({
-        where: { id: { in: productIds }, isActive: true },
+        where: { id: { in: productIds }, isActive: true, deletedAt: null },
         include: {
           translations: true,
           brand: { include: { translations: true } },

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Menu, Heart } from "lucide-react";
 import { Container } from "@/components/ui/Container";
+import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
 import { SearchBar } from "./SearchBar";
 import { MobileSearchTrigger } from "./MobileSearchTrigger";
@@ -15,8 +16,10 @@ import { TopUtilityBar } from "./TopUtilityBar";
 import { HeaderAccountMenu } from "./HeaderAccountMenu";
 import { HeaderCartButton } from "@/components/cart/HeaderCartButton";
 import { CartDrawer } from "@/components/cart/CartDrawer";
+import { HEADER_SEARCH_STACK_CLASS } from "@/lib/headerStack";
 import { useWishlist } from "@/hooks/useWishlist";
 import { useIsClient } from "@/hooks/useIsClient";
+import type { CategoryNavNode, MainNavItem } from "@/lib/categoryNav";
 
 function IconLink({
   href,
@@ -45,7 +48,13 @@ function IconLink({
   );
 }
 
-export function Header() {
+export function Header({
+  mainNav = [],
+  categoryTree = [],
+}: {
+  mainNav?: MainNavItem[];
+  categoryTree?: CategoryNavNode[];
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const { count: wishlistCount } = useWishlist();
@@ -55,7 +64,7 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full">
       <TopUtilityBar />
 
-      <div className="border-b border-border bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
+      <div className={cn("overflow-visible border-b border-border bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80", HEADER_SEARCH_STACK_CLASS)}>
         <Container>
           <div className="flex h-16 items-center gap-3 lg:h-[4.25rem] lg:gap-6">
             <button
@@ -70,7 +79,7 @@ export function Header() {
             <Logo className="shrink-0" />
 
             <div className="hidden flex-1 lg:block">
-              <SearchBar className="mx-auto max-w-xl" />
+              <SearchBar className="relative z-20 mx-auto max-w-xl" />
             </div>
 
             <div className="ml-auto flex items-center gap-0.5 lg:ml-0 lg:gap-1">
@@ -88,10 +97,10 @@ export function Header() {
         </Container>
       </div>
 
-      <CategoryNav />
-      <MobileCategoryChips />
+      <CategoryNav mainNav={mainNav} categoryTree={categoryTree} />
+      <MobileCategoryChips mainNav={mainNav} />
 
-      <MobileMenu open={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <MobileMenu open={mobileOpen} onClose={() => setMobileOpen(false)} mainNav={mainNav} categoryTree={categoryTree} />
       <MobileSearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
       <CartDrawer />
     </header>

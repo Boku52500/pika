@@ -1,4 +1,4 @@
-import { Header } from "@/components/layout/Header";
+import { StorefrontHeader } from "@/components/layout/StorefrontHeader";
 import { Footer } from "@/components/layout/Footer";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
@@ -7,7 +7,7 @@ import type { InfoPageDef } from "@/lib/infoPages";
 export function InfoPageShell({ page }: { page: InfoPageDef }) {
   return (
     <>
-      <Header />
+      <StorefrontHeader />
       <main className="flex-1">
         <Container className="py-8 sm:py-12">
           <Breadcrumbs items={[{ label: page.title }]} />

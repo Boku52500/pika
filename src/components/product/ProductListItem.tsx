@@ -8,7 +8,7 @@ import { ProductRating } from "./ProductRating";
 import { ProductPrice } from "./ProductPrice";
 import { WishlistButton } from "./WishlistButton";
 import { AddToCartButton } from "./AddToCartButton";
-import { ProductBadge, DiscountBadge, NewBadge } from "./ProductBadge";
+import { DiscountBadge } from "./ProductBadge";
 
 /**
  * Horizontal row variant of ProductCard used by the category page's "list"
@@ -39,8 +39,6 @@ export function ProductListItem({ product, className }: { product: Product; clas
 
         <div className="pointer-events-none absolute left-3 top-3 flex flex-col items-start gap-1.5">
           {discount ? <DiscountBadge percent={discount} /> : null}
-          {product.isNew ? <NewBadge /> : null}
-          {product.badge ? <ProductBadge badge={product.badge} /> : null}
         </div>
 
         <WishlistButton product={product} className="absolute right-3 top-3" />

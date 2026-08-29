@@ -4,6 +4,7 @@ import { mapProduct } from "@/server/catalog/mappers";
 import { productDetailInclude } from "@/server/catalog/include";
 import type { CatalogProduct, ProductListFilters } from "@/server/catalog/types";
 import { DEFAULT_LOCALE, resolveLocale } from "@/server/locale";
+import { isStorefrontVisible, storefrontProductWhere } from "@/server/catalog/visibility";
 
 async function categoryIdsForSlug(slug: string): Promise<string[]> {
   const rows = await prisma.$queryRaw<{ id: string }[]>`
@@ -21,14 +22,14 @@ function productWhere(filters: ProductListFilters, categoryIds?: string[]): Pris
   const active = filters.active ?? true;
   const search = filters.search?.trim();
 
-  const where: Prisma.ProductWhereInput = {
+  const where: Prisma.ProductWhereInput = storefrontProductWhere({
     isActive: active ? true : undefined,
     isFeatured: filters.featured ? true : undefined,
     isNew: filters.isNew ? true : undefined,
     newArrivalSort: filters.newArrivals ? { not: null } : undefined,
     brand: filters.brandSlug ? { slug: filters.brandSlug } : undefined,
     categoryId: categoryIds ? { in: categoryIds } : undefined,
-  };
+  });
 
   if (search) {
     where.OR = [
@@ -66,7 +67,7 @@ export async function getProductBySlug(
     where: { slug },
     include: productDetailInclude,
   });
-  if (!product || !product.isActive) return null;
+  if (!product || !isStorefrontVisible(product)) return null;
   return mapProduct(product, resolveLocale(locale));
 }
 
@@ -78,7 +79,7 @@ export async function getProductById(
     where: { id },
     include: productDetailInclude,
   });
-  if (!product || !product.isActive) return null;
+  if (!product || !isStorefrontVisible(product)) return null;
   return mapProduct(product, resolveLocale(locale));
 }
 
@@ -90,7 +91,7 @@ export async function getProductsByIds(
   if (unique.length === 0) return [];
 
   const products = await prisma.product.findMany({
-    where: { id: { in: unique }, isActive: true },
+    where: storefrontProductWhere({ id: { in: unique } }),
     include: productDetailInclude,
   });
 
@@ -142,13 +143,13 @@ export async function getRelatedProducts(
 
   const related = relations
     .map((row) => row.relatedProduct)
-    .filter((item) => item.isActive)
+    .filter((item) => isStorefrontVisible(item))
     .map((item) => mapProduct(item, resolveLocale(locale)));
 
   if (related.length > 0) return related.slice(0, limit);
 
   const fallback = await prisma.product.findMany({
-    where: { categoryId: product.categoryId, isActive: true, id: { not: product.id } },
+    where: storefrontProductWhere({ categoryId: product.categoryId, id: { not: product.id } }),
     include: productDetailInclude,
     take: limit,
     orderBy: { createdAt: "desc" },
@@ -171,7 +172,7 @@ export async function getRecommendedProducts(
 
   const blocked = [...new Set([product.id, ...excludeIds])];
   const recommended = await prisma.product.findMany({
-    where: { isActive: true, id: { notIn: blocked } },
+    where: storefrontProductWhere({ id: { notIn: blocked } }),
     include: productDetailInclude,
     orderBy: [{ ratingAverage: { sort: "desc", nulls: "last" } }, { reviewCount: "desc" }],
     take: limit,

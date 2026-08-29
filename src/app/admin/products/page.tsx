@@ -7,6 +7,7 @@ import { AdminPagination } from "@/components/admin/AdminPagination";
 import { adminInputClass, adminSelectClass } from "@/components/admin/adminUi";
 import { formatPrice } from "@/lib/utils";
 import { STOCK_STATE_LABEL } from "@/lib/adminLabels";
+import { AdminProductDeleteButton } from "@/components/admin/AdminProductDeleteButton";
 
 export const metadata: Metadata = { title: "პროდუქტები" };
 
@@ -24,7 +25,7 @@ export default async function AdminProductsPage({
   const q = param(params.q);
   const categoryId = param(params.category);
   const brandId = param(params.brand);
-  const active = (param(params.active) || "all") as "all" | "active" | "inactive";
+  const active = (param(params.active) || "all") as "all" | "active" | "inactive" | "archived";
   const stock = (param(params.stock) || "all") as "all" | "in-stock" | "low-stock" | "out-of-stock";
   const page = Math.max(1, Number(param(params.page) || "1") || 1);
 
@@ -55,10 +56,15 @@ export default async function AdminProductsPage({
         <Button href="/admin/products/new">ახალი პროდუქტი</Button>
       </div>
 
-      <form method="get" className="grid gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-6">
+      <form
+        method="get"
+        autoComplete="off"
+        key={`${q}|${categoryId}|${brandId}|${active}|${stock}|${page}`}
+        className="grid gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-6"
+      >
         <label className="flex flex-col gap-1 lg:col-span-2">
           <span className="text-[0.8125rem] font-medium">ძიება</span>
-          <input name="q" defaultValue={q} placeholder="სახელი, SKU, slug" className={adminInputClass} />
+          <input name="q" defaultValue={q} placeholder="სახელი, SKU, slug" autoComplete="off" className={adminInputClass} />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[0.8125rem] font-medium">კატეგორია</span>
@@ -88,6 +94,7 @@ export default async function AdminProductsPage({
             <option value="all">ყველა</option>
             <option value="active">აქტიური</option>
             <option value="inactive">გამორთული</option>
+            <option value="archived">არქივი</option>
           </select>
         </label>
         <label className="flex flex-col gap-1">
@@ -138,12 +145,13 @@ export default async function AdminProductsPage({
                       </div>
                       <div className="min-w-0">
                         <p className="line-clamp-2 font-medium text-text">{row.name}</p>
-                        <p className="text-label text-text-faint">
-                          {row.isFeatured ? "რჩეული" : ""}
-                          {row.isFeatured && row.isNew ? " · " : ""}
-                          {row.isNew ? "ახალი" : ""}
-                          {row.badgeLabel ? ` · ${row.badgeLabel}` : ""}
-                        </p>
+                        {row.isFeatured || row.isNew || row.badgeLabel ? (
+                          <p className="text-label text-text-faint">
+                            {[row.isFeatured ? "რჩეული" : null, row.isNew ? "ახალი" : null, row.badgeLabel || null]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   </td>
@@ -160,11 +168,22 @@ export default async function AdminProductsPage({
                     <span className="tnum">{row.stockQuantity}</span>
                     <span className="block text-label text-text-faint">{STOCK_STATE_LABEL[row.stockState]}</span>
                   </td>
-                  <td className="px-3 py-2.5">{row.isActive ? "აქტიური" : "გამორთული"}</td>
                   <td className="px-3 py-2.5">
-                    <Link href={`/admin/products/${row.id}`} className="font-medium text-brand-700 hover:underline">
-                      რედაქტირება
-                    </Link>
+                    {row.deletedAt ? "არქივი" : row.isActive ? "აქტიური" : "გამორთული"}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex flex-col items-start gap-1">
+                      <Link href={`/admin/products/${row.id}`} className="font-medium text-brand-700 hover:underline">
+                        რედაქტირება
+                      </Link>
+                      {!row.deletedAt ? (
+                        <AdminProductDeleteButton
+                          productId={row.id}
+                          productName={row.name}
+                          className="font-medium text-danger-600 hover:underline"
+                        />
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}

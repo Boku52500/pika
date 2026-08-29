@@ -11,6 +11,8 @@ export type AdminCategoryRow = {
   parentName: string | null;
   isActive: boolean;
   sortOrder: number;
+  showInMainNav: boolean;
+  navSortOrder: number;
   productCount: number;
   depth: number;
 };
@@ -24,6 +26,8 @@ export type AdminCategoryEditorData = {
   sortOrder: number;
   isActive: boolean;
   indexable: boolean;
+  showInMainNav: boolean;
+  navSortOrder: number;
   translations: {
     ka: { name: string; description: string; seoTitle: string; seoDescription: string };
     en: { name: string; description: string; seoTitle: string; seoDescription: string };
@@ -78,6 +82,8 @@ export async function listAdminCategories(): Promise<AdminCategoryRow[]> {
         parentName: category.parent ? pickTranslation(category.parent.translations).name : null,
         isActive: category.isActive,
         sortOrder: category.sortOrder,
+        showInMainNav: category.showInMainNav,
+        navSortOrder: category.navSortOrder,
         productCount: category._count.products,
         depth,
       });
@@ -97,6 +103,8 @@ export async function listAdminCategories(): Promise<AdminCategoryRow[]> {
       parentName: category.parent ? pickTranslation(category.parent.translations).name : null,
       isActive: category.isActive,
       sortOrder: category.sortOrder,
+      showInMainNav: category.showInMainNav,
+      navSortOrder: category.navSortOrder,
       productCount: category._count.products,
       depth: 0,
     });
@@ -120,6 +128,8 @@ export async function getAdminCategoryEditor(id: string): Promise<AdminCategoryE
     sortOrder: category.sortOrder,
     isActive: category.isActive,
     indexable: category.indexable,
+    showInMainNav: category.showInMainNav,
+    navSortOrder: category.navSortOrder,
     translations: {
       ka: copyFrom(category.translations, "ka"),
       en: copyFrom(category.translations, "en"),
@@ -138,6 +148,8 @@ export function emptyCategoryEditor(): AdminCategoryEditorData {
     sortOrder: 0,
     isActive: true,
     indexable: true,
+    showInMainNav: false,
+    navSortOrder: 0,
     translations: { ka: emptyCopy(), en: emptyCopy(), ru: emptyCopy() },
   };
 }

@@ -29,11 +29,11 @@ export function EmptyCartState({
         </p>
       </div>
 
-      <div className="flex flex-col gap-2.5 sm:flex-row">
-        <Button href="/" variant="secondary" onClick={onNavigate}>
+      <div className={cn("flex w-full flex-col gap-2.5", compact && "items-stretch")}>
+        <Button href="/" variant="secondary" onClick={onNavigate} className={compact ? "w-full whitespace-normal" : undefined}>
           მთავარზე დაბრუნება
         </Button>
-        <Button href={featuredCategories[0].href} onClick={onNavigate}>
+        <Button href={featuredCategories[0].href} onClick={onNavigate} className={compact ? "w-full whitespace-normal" : undefined}>
           პროდუქტების დათვალიერება
         </Button>
       </div>

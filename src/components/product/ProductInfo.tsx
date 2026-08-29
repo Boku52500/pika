@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { Product } from "@/types/product";
 import { cn } from "@/lib/utils";
 import { availabilityLabel } from "@/lib/productLabels";
-import { ProductBadge, NewBadge } from "./ProductBadge";
 import { ProductRating } from "./ProductRating";
 
 /** Brand / title / rating / SKU / availability block — top of the PDP right column. */
@@ -19,13 +18,6 @@ export function ProductInfo({
 }) {
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      {product.isNew || product.badge ? (
-        <div className="flex flex-wrap items-center gap-2">
-          {product.isNew ? <NewBadge /> : null}
-          {product.badge ? <ProductBadge badge={product.badge} /> : null}
-        </div>
-      ) : null}
-
       <div>
         <Link
           href={`/category/${product.category}`}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Header } from "@/components/layout/Header";
+import { StorefrontHeader } from "@/components/layout/StorefrontHeader";
 import { Footer } from "@/components/layout/Footer";
 import { PaymentReturnClient } from "@/components/payments/PaymentReturnClient";
 import { getSessionCustomer } from "@/server/auth/session";
@@ -25,7 +25,7 @@ export default async function CheckoutPaymentFailPage({
 
   return (
     <>
-      <Header />
+      <StorefrontHeader />
       <main className="flex-1">
         <PaymentReturnClient data={data} variant="fail" />
       </main>

@@ -26,7 +26,7 @@ export default async function AdminEditProductPage({ params }: { params: Promise
         brands={lookups.brands}
         categories={lookups.categories}
         variantAttributes={lookups.variantAttributes}
-        specGroups={lookups.specGroups}
+        specDefinitions={lookups.specDefinitions}
         storageConfigured={isStorageConfigured()}
       />
     </div>

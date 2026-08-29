@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Search } from "lucide-react";
-import { Header } from "@/components/layout/Header";
+import { StorefrontHeader } from "@/components/layout/StorefrontHeader";
 import { Footer } from "@/components/layout/Footer";
 import { Container } from "@/components/ui/Container";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
@@ -34,7 +34,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   if (!query) {
     return (
       <>
-        <Header />
+        <StorefrontHeader />
         <main className="flex-1">
           <div className="py-16 sm:py-24">
             <Container>
@@ -60,7 +60,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   return (
     <>
-      <Header />
+      <StorefrontHeader />
       <main className="flex-1">
         <SearchPageClient
           key={page.query}

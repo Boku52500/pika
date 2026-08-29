@@ -1,4 +1,4 @@
-import { Header } from "@/components/layout/Header";
+import { StorefrontHeader } from "@/components/layout/StorefrontHeader";
 import { Footer } from "@/components/layout/Footer";
 
 /**
@@ -9,7 +9,7 @@ import { Footer } from "@/components/layout/Footer";
 export default function ProductLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <Header />
+      <StorefrontHeader />
       <main className="flex-1 pb-24 lg:pb-0">{children}</main>
       <Footer />
     </>

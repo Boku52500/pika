@@ -53,7 +53,7 @@ function productCandidateWhere(needles: string[]): Prisma.ProductWhereInput {
     },
   ]);
 
-  return { isActive: true, OR: clauses };
+  return { isActive: true, deletedAt: null, OR: clauses };
 }
 
 function rankCatalogProducts(products: CatalogProduct[], query: string): CatalogProduct[] {

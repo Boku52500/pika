@@ -25,7 +25,7 @@ export async function getAdminDashboard() {
     paidTotals,
   ] = await Promise.all([
     prisma.product.count(),
-    prisma.product.count({ where: { isActive: true } }),
+    prisma.product.count({ where: { isActive: true, deletedAt: null } }),
     prisma.product.count({
       where: { stockQuantity: { gt: 0, lte: LOW_STOCK_THRESHOLD } },
     }),

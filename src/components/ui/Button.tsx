@@ -7,7 +7,7 @@ type Size = "sm" | "md" | "lg";
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    "bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 shadow-xs",
+    "bg-brand-600 text-white hover:bg-brand-700 hover:text-white active:bg-brand-800 active:text-white disabled:text-white focus-visible:text-white shadow-xs",
   secondary:
     "bg-white text-ink-900 border border-border-strong hover:bg-surface-2 active:bg-bg-subtle",
   "outline-on-ink":
@@ -17,7 +17,7 @@ const variantClasses: Record<Variant, string> = {
 
 const sizeClasses: Record<Size, string> = {
   sm: "h-9 px-3.5 text-[0.8125rem] gap-1.5 rounded-[var(--radius-sm)]",
-  md: "h-11 px-5 text-btn gap-2 rounded-[var(--radius-md)]",
+  md: "h-11 px-5 type-btn gap-2 rounded-[var(--radius-md)]",
   lg: "h-[3.25rem] px-7 text-[1rem] gap-2.5 rounded-[var(--radius-md)]",
 };
 
@@ -45,8 +45,8 @@ export function Button({
 }: ButtonProps) {
   const classes = cn(
     "inline-flex items-center justify-center whitespace-nowrap font-semibold transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2",
-    variantClasses[variant],
     sizeClasses[size],
+    variantClasses[variant],
     className
   );
 

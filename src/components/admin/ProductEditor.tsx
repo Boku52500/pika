@@ -1,19 +1,29 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
 import { AdminConfirmDialog } from "@/components/admin/AdminConfirmDialog";
 import { ProductImageManager, type EditorImage } from "@/components/admin/ProductImageManager";
-import { adminCardClass, adminInputErrorClass, adminSelectClass, adminTextareaClass } from "@/components/admin/adminUi";
+import {
+  ADMIN_EDITOR_BOTTOM_PAD_CLASS,
+  ADMIN_STICKY_FOOTER_CLASS,
+  ADMIN_STICKY_FOOTER_INNER_CLASS,
+  adminCardClass,
+  adminInputErrorClass,
+  adminSelectClass,
+  adminTextareaClass,
+} from "@/components/admin/adminUi";
 import { BADGE_KIND_OPTIONS, STOCK_STATE_LABEL } from "@/lib/adminLabels";
-import { deactivateAdminProduct, saveAdminProduct } from "@/server/actions/admin";
+import { deactivateAdminProduct, restoreAdminProduct, saveAdminProduct, createAdminVariantOption, createAdminSpecification, createAdminSpecificationValue } from "@/server/actions/admin";
+import { AdminCreatableCombobox } from "@/components/admin/AdminCreatableCombobox";
+import { AdminProductDeleteButton } from "@/components/admin/AdminProductDeleteButton";
 import type {
   AdminProductEditorData,
   AdminLookupOption,
-  AdminSpecGroup,
+  AdminSpecDefinition,
   AdminVariantAttribute,
 } from "@/server/admin/products";
 
@@ -22,7 +32,7 @@ type Props = {
   brands: AdminLookupOption[];
   categories: AdminLookupOption[];
   variantAttributes: AdminVariantAttribute[];
-  specGroups: AdminSpecGroup[];
+  specDefinitions: AdminSpecDefinition[];
   isNew?: boolean;
   storageConfigured?: boolean;
 };
@@ -49,7 +59,15 @@ type EditorVariant = {
   key: string;
 };
 
-export function ProductEditor({ product, brands, categories, variantAttributes, specGroups, isNew, storageConfigured = false }: Props) {
+type SpecRow = {
+  key: string;
+  specificationId: string;
+  specificationName: string;
+  valueId: string;
+  value: string;
+};
+
+export function ProductEditor({ product, brands, categories, variantAttributes, specDefinitions, isNew, storageConfigured = false }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState(product);
@@ -59,16 +77,24 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
   const [variants, setVariants] = useState<EditorVariant[]>(
     () => product.variants.map((variant, index) => ({ ...variant, key: variant.id || `var-${index}` })),
   );
-  const specMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const row of product.specifications) map[row.specificationId] = row.value;
-    return map;
-  }, [product.specifications]);
-  const [specs, setSpecs] = useState<Record<string, string>>(specMap);
+  const [attributes, setAttributes] = useState(variantAttributes);
+  const [definitions, setDefinitions] = useState(specDefinitions);
+  const [specRows, setSpecRows] = useState<SpecRow[]>(() =>
+    product.specifications
+      .filter((row) => row.value.trim())
+      .map((row, index) => ({
+        key: row.specificationId || `spec-${index}`,
+        specificationId: row.specificationId,
+        specificationName: specDefinitions.find((item) => item.id === row.specificationId)?.name ?? "",
+        valueId: row.valueId,
+        value: row.value,
+      })),
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [confirmRestore, setConfirmRestore] = useState(false);
 
   function patch<K extends keyof AdminProductEditorData>(key: K, value: AdminProductEditorData[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -140,7 +166,12 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
           isActive: variant.isActive,
           optionIds: variant.optionIds,
         })),
-        specifications: Object.entries(specs).map(([specificationId, value]) => ({ specificationId, value })),
+        specifications: specRows.map((row) => ({
+          specificationId: row.specificationId || undefined,
+          specificationName: row.specificationName,
+          valueId: row.valueId,
+          value: row.value,
+        })),
       });
       if (!result.ok) {
         setMessage(result.message);
@@ -172,11 +203,33 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
     });
   }
 
+  function restore() {
+    if (!form.id) return;
+    startTransition(async () => {
+      const result = await restoreAdminProduct({ id: form.id });
+      setConfirmRestore(false);
+      if (!result.ok) {
+        setMessage(result.message);
+        return;
+      }
+      setSuccess("პროდუქტი აღდგენილია");
+      patch("isActive", true);
+      patch("deletedAt", null);
+      router.refresh();
+    });
+  }
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col">
+      <div className={`flex flex-col gap-5 ${ADMIN_EDITOR_BOTTOM_PAD_CLASS}`}>
       {message ? (
         <p role="alert" className="rounded-[var(--radius-sm)] border border-danger-500/25 bg-danger-50 px-3 py-2 text-small text-danger-600">
           {message}
+        </p>
+      ) : null}
+      {form.deletedAt ? (
+        <p role="status" className="rounded-[var(--radius-sm)] border border-warning-500/25 bg-warning-50 px-3 py-2 text-small text-text">
+          ეს პროდუქტი არქივშია და ვიტრინაზე არ ჩანს. ისტორიული შეკვეთები შენარჩუნებულია.
         </p>
       ) : null}
       {success ? (
@@ -450,30 +503,39 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
                   </label>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {variantAttributes.map((attribute) => (
+                  {attributes.map((attribute) => (
                     <FormField key={attribute.id} id={`v-${index}-${attribute.slug}`} label={attribute.name}>
-                      <select
+                      <AdminCreatableCombobox
                         id={`v-${index}-${attribute.slug}`}
-                        value={variant.optionIds.find((id) => attribute.options.some((option) => option.id === id)) ?? ""}
-                        onChange={(e) => {
-                          const nextId = e.target.value;
+                        valueId={variant.optionIds.find((id) => attribute.options.some((option) => option.id === id)) ?? ""}
+                        options={attribute.options.map((option) => ({ id: option.id, label: option.name }))}
+                        placeholder="ძებნა ან ახალი მნიშვნელობა..."
+                        createLabel={(label) => `+ დამატება „${label}“`}
+                        onSelect={(option) => {
                           setVariants((current) =>
                             current.map((row, i) => {
                               if (i !== index) return row;
-                              const without = row.optionIds.filter((id) => !attribute.options.some((option) => option.id === id));
-                              return { ...row, optionIds: nextId ? [...without, nextId] : without };
+                              const without = row.optionIds.filter((id) => !attribute.options.some((item) => item.id === id));
+                              return { ...row, optionIds: option ? [...without, option.id] : without };
                             }),
                           );
                         }}
-                        className={adminSelectClass}
-                      >
-                        <option value="">—</option>
-                        {attribute.options.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.name}
-                          </option>
-                        ))}
-                      </select>
+                        onCreate={async (label) => {
+                          const result = await createAdminVariantOption({ attributeId: attribute.id, name: label });
+                          if (!result.ok) {
+                            setMessage(result.message);
+                            return null;
+                          }
+                          setAttributes((current) =>
+                            current.map((item) =>
+                              item.id === attribute.id
+                                ? { ...item, options: [...item.options, { id: result.data.id, slug: result.data.slug, name: result.data.name, swatch: null }] }
+                                : item,
+                            ),
+                          );
+                          return { id: result.data.id, label: result.data.name };
+                        }}
+                      />
                     </FormField>
                   ))}
                 </div>
@@ -491,40 +553,147 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
       </section>
 
       <section className={adminCardClass}>
-        <h2 className="mb-4 text-base font-semibold text-text">სპეციფიკაციები</h2>
-        <div className="flex flex-col gap-5">
-          {specGroups.map((group) => (
-            <div key={group.id}>
-              <h3 className="mb-3 text-small font-semibold text-text">{group.name}</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {group.definitions.map((definition) => (
-                  <FormField key={definition.id} id={`spec-${definition.id}`} label={definition.unit ? `${definition.name} (${definition.unit})` : definition.name}>
-                    <input
-                      id={`spec-${definition.id}`}
-                      value={specs[definition.id] ?? ""}
-                      onChange={(e) => setSpecs((current) => ({ ...current, [definition.id]: e.target.value }))}
-                      className={adminInputErrorClass(false)}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-text">სპეციფიკაციები</h2>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() =>
+              setSpecRows((current) => [
+                ...current,
+                { key: `spec-${Date.now()}`, specificationId: "", specificationName: "", valueId: "", value: "" },
+              ])
+            }
+          >
+            <Plus className="size-4" />
+            სპეციფიკაციის დამატება
+          </Button>
+        </div>
+        {specRows.length === 0 ? (
+          <p className="text-small text-text-muted">სპეციფიკაციები არ არის. დაამატეთ RAM, Processor ან ნებისმიერი სხვა ველი — ახალი სქემა არ არის საჭირო.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {specRows.map((row, index) => {
+              const definition = definitions.find((item) => item.id === row.specificationId);
+              const valueOptions = definition?.values ?? [];
+              return (
+                <div key={row.key} className="grid gap-3 rounded-[var(--radius-sm)] border border-border p-3 sm:grid-cols-[1fr_1fr_auto]">
+                  <FormField id={`spec-name-${index}`} label="სპეციფიკაცია">
+                    <AdminCreatableCombobox
+                      id={`spec-name-${index}`}
+                      valueId={row.specificationId}
+                      options={definitions.map((item) => ({ id: item.id, label: item.unit ? `${item.name} (${item.unit})` : item.name }))}
+                      placeholder="ძებნა ან ახალი სპეციფიკაცია..."
+                      createLabel={(label) => `+ დამატება „${label}“`}
+                      onSelect={(option) => {
+                        setSpecRows((current) =>
+                          current.map((item, i) =>
+                            i === index
+                              ? {
+                                  ...item,
+                                  specificationId: option?.id ?? "",
+                                  specificationName: option?.label ?? "",
+                                  valueId: "",
+                                  value: "",
+                                }
+                              : item,
+                          ),
+                        );
+                      }}
+                      onCreate={async (label) => {
+                        const result = await createAdminSpecification({ name: label });
+                        if (!result.ok) {
+                          setMessage(result.message);
+                          return null;
+                        }
+                        setDefinitions((current) =>
+                          current.some((item) => item.id === result.data.id)
+                            ? current
+                            : [...current, { id: result.data.id, slug: "", name: result.data.name, unit: null, values: [] }],
+                        );
+                        return { id: result.data.id, label: result.data.name };
+                      }}
                     />
                   </FormField>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+                  <FormField id={`spec-value-${index}`} label="მნიშვნელობა">
+                    <AdminCreatableCombobox
+                      id={`spec-value-${index}`}
+                      valueId={row.valueId}
+                      options={valueOptions.map((item) => ({ id: item.id, label: item.name }))}
+                      placeholder="ძებნა ან ახალი მნიშვნელობა..."
+                      disabled={!row.specificationId}
+                      createLabel={(label) => `+ დამატება „${label}“`}
+                      onSelect={(option) => {
+                        setSpecRows((current) =>
+                          current.map((item, i) =>
+                            i === index ? { ...item, valueId: option?.id ?? "", value: option?.label ?? "" } : item,
+                          ),
+                        );
+                      }}
+                      onCreate={async (label) => {
+                        if (!row.specificationId) return null;
+                        const result = await createAdminSpecificationValue({ specificationId: row.specificationId, name: label });
+                        if (!result.ok) {
+                          setMessage(result.message);
+                          return null;
+                        }
+                        setDefinitions((current) =>
+                          current.map((item) =>
+                            item.id === row.specificationId
+                              ? { ...item, values: [...item.values, { id: result.data.id, name: result.data.name }] }
+                              : item,
+                          ),
+                        );
+                        return { id: result.data.id, label: result.data.name };
+                      }}
+                    />
+                  </FormField>
+                  <button
+                    type="button"
+                    className="text-small self-end pb-2 text-danger-600"
+                    onClick={() => setSpecRows((current) => current.filter((_, i) => i !== index))}
+                  >
+                    წაშლა
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
+      </div>
 
-      <div className="sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center gap-3 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur sm:-mx-0 sm:rounded-[var(--radius-md)] sm:border sm:px-4">
+      <div className={ADMIN_STICKY_FOOTER_CLASS}>
+        <div className={ADMIN_STICKY_FOOTER_INNER_CLASS}>
         <Button type="button" onClick={submit} disabled={pending}>
           {pending ? "ინახება..." : isNew ? "შექმნა" : "შენახვა"}
         </Button>
-        {!isNew ? (
+        {!isNew && !form.deletedAt ? (
           <Button type="button" variant="secondary" disabled={pending || !form.isActive} onClick={() => setConfirmDeactivate(true)}>
             გამორთვა
           </Button>
         ) : null}
+        {!isNew && form.deletedAt ? (
+          <Button type="button" variant="secondary" disabled={pending} onClick={() => setConfirmRestore(true)}>
+            აღდგენა
+          </Button>
+        ) : null}
+        {!isNew && !form.deletedAt ? (
+          <AdminProductDeleteButton
+            productId={form.id}
+            productName={form.translations.ka.name || form.sku}
+            className="text-small font-semibold text-danger-600"
+            onArchived={() => {
+              patch("deletedAt", new Date().toISOString());
+              patch("isActive", false);
+            }}
+          />
+        ) : null}
         <Button href="/admin/products" variant="ghost">
           სიაზე დაბრუნება
         </Button>
+        </div>
       </div>
 
       <AdminConfirmDialog
@@ -536,6 +705,15 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
         pending={pending}
         onClose={() => setConfirmDeactivate(false)}
         onConfirm={deactivate}
+      />
+      <AdminConfirmDialog
+        open={confirmRestore}
+        title="პროდუქტის აღდგენა"
+        description="პროდუქტი ისევ გამოჩნდება ვიტრინაზე, თუ აქტიურია."
+        confirmLabel="აღდგენა"
+        pending={pending}
+        onClose={() => setConfirmRestore(false)}
+        onConfirm={restore}
       />
     </div>
   );

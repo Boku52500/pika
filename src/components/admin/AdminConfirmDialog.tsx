@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
 
 export function AdminConfirmDialog({
@@ -42,7 +43,7 @@ export function AdminConfirmDialog({
 
   if (!open) return null;
 
-  return (
+  const dialog = (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
       <button
         type="button"
@@ -80,4 +81,7 @@ export function AdminConfirmDialog({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(dialog, document.body);
 }

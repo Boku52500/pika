@@ -3,17 +3,22 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { X, MapPin, User, Heart, Store, Phone } from "lucide-react";
-import { primaryNav } from "@/data/nav";
 import { Logo } from "./Logo";
+import { CategoryTreeList } from "./AllCategoriesMenu";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import type { CategoryNavNode, MainNavItem } from "@/lib/categoryNav";
 
 export function MobileMenu({
   open,
   onClose,
+  mainNav = [],
+  categoryTree = [],
 }: {
   open: boolean;
   onClose: () => void;
+  mainNav?: MainNavItem[];
+  categoryTree?: CategoryNavNode[];
 }) {
   const { customer, isLoggedIn } = useAuth();
 
@@ -91,21 +96,24 @@ export function MobileMenu({
           </div>
 
           <nav aria-label="კატეგორიები" className="flex flex-col p-2">
-            {primaryNav.map((item) => (
-              <Link
-                key={item.id}
-                href={item.href}
-                onClick={onClose}
-                className={cn(
-                  "text-nav rounded-[var(--radius-sm)] px-3 py-3 transition-colors",
-                  item.highlight
-                    ? "font-semibold text-danger-500"
-                    : "text-ink-800 hover:bg-black/[0.04]"
-                )}
-              >
-                {item.name}
-              </Link>
-            ))}
+            <p className="px-3 py-2 text-label text-text-faint">ყველა კატეგორია</p>
+            {categoryTree.length > 0 ? (
+              <CategoryTreeList nodes={categoryTree} onNavigate={onClose} />
+            ) : (
+              mainNav.map((item) => (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  onClick={onClose}
+                  className={cn(
+                    "text-nav rounded-[var(--radius-sm)] px-3 py-3 transition-colors",
+                    item.highlight ? "font-semibold text-danger-500" : "text-ink-800 hover:bg-black/[0.04]",
+                  )}
+                >
+                  {item.name}
+                </Link>
+              ))
+            )}
           </nav>
 
           <div className="border-t border-border p-4 text-small text-text-muted">

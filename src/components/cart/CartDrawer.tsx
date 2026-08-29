@@ -98,7 +98,7 @@ export function CartDrawer() {
         </div>
 
         {items.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center px-6">
+          <div className="flex min-w-0 flex-1 items-center justify-center overflow-x-hidden px-4 sm:px-6">
             <EmptyCartState compact onNavigate={closeDrawer} />
           </div>
         ) : (

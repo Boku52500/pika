@@ -51,6 +51,8 @@ export function CategoryEditor({
         sortOrder: Number(form.sortOrder),
         isActive: form.isActive,
         indexable: form.indexable,
+        showInMainNav: form.showInMainNav,
+        navSortOrder: Number(form.navSortOrder),
         translations: form.translations,
       });
       if (!result.ok) {
@@ -96,8 +98,11 @@ export function CategoryEditor({
               ))}
             </select>
           </FormField>
-          <FormField id="cat-sort" label="რიგი">
+          <FormField id="cat-sort" label="კატალოგის რიგი">
             <input id="cat-sort" type="number" min={0} value={form.sortOrder} onChange={(e) => setForm((c) => ({ ...c, sortOrder: Number(e.target.value) }))} className={adminInputErrorClass(false)} />
+          </FormField>
+          <FormField id="cat-nav-sort" label="ნავიგაციის რიგი">
+            <input id="cat-nav-sort" type="number" min={0} value={form.navSortOrder} onChange={(e) => setForm((c) => ({ ...c, navSortOrder: Number(e.target.value) }))} className={adminInputErrorClass(false)} />
           </FormField>
           <FormField id="cat-image" label="სურათის URL" optional className="sm:col-span-2">
             <input id="cat-image" value={form.imageUrl} onChange={(e) => setForm((c) => ({ ...c, imageUrl: e.target.value }))} className={adminInputErrorClass(false)} />
@@ -123,6 +128,10 @@ export function CategoryEditor({
           <label className="flex min-h-11 items-center gap-2 text-small">
             <input type="checkbox" checked={form.indexable} onChange={(e) => setForm((c) => ({ ...c, indexable: e.target.checked }))} />
             ინდექსირებადი
+          </label>
+          <label className="flex min-h-11 items-center gap-2 text-small">
+            <input type="checkbox" checked={form.showInMainNav} onChange={(e) => setForm((c) => ({ ...c, showInMainNav: e.target.checked }))} />
+            გამოჩნდეს მთავარ ნავიგაციაში
           </label>
         </div>
       </section>

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Header } from "@/components/layout/Header";
+import { StorefrontHeader } from "@/components/layout/StorefrontHeader";
 import { Footer } from "@/components/layout/Footer";
 import { CheckoutPageClient } from "@/components/checkout/CheckoutPageClient";
 import { noIndexMetadata } from "@/lib/seo";
@@ -20,7 +20,7 @@ export default async function CheckoutPage() {
     session && capabilities.savedCard ? await listCustomerSavedPaymentMethods(session.id) : [];
   return (
     <>
-      <Header />
+      <StorefrontHeader />
       <main className="flex-1">
         <CheckoutPageClient
           capabilities={capabilities}

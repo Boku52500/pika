@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { heroSlides } from "@/data/heroSlides";
 import { iconByVisual } from "@/components/product/ProductImage";
+import { wrapCarouselIndex, trackScrollLeftForSlide } from "@/lib/heroCarousel";
 import { cn } from "@/lib/utils";
 
 /**
@@ -38,12 +39,15 @@ export function HeroCarousel() {
   }, []);
 
   const goTo = (index: number) => {
-    const clamped = (index + heroSlides.length) % heroSlides.length;
-    slideRefs.current[clamped]?.scrollIntoView({
+    const track = trackRef.current;
+    const clamped = wrapCarouselIndex(index, heroSlides.length);
+    const slide = slideRefs.current[clamped];
+    if (!track || !slide) return;
+    track.scrollTo({
+      left: trackScrollLeftForSlide(track, slide),
       behavior: "smooth",
-      inline: "start",
-      block: "nearest",
     });
+    setActive(clamped);
   };
 
   return (
@@ -119,7 +123,7 @@ export function HeroCarousel() {
             key={slide.id}
             type="button"
             aria-label={`სლაიდი ${index + 1}`}
-            aria-current={index === active}
+            aria-current={index === active ? true : undefined}
             onClick={() => goTo(index)}
             className={cn(
               "h-1.5 rounded-full transition-all duration-200",

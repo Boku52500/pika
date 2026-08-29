@@ -16,7 +16,7 @@ export type AdminProductListFilters = {
   q?: string;
   categoryId?: string;
   brandId?: string;
-  active?: "all" | "active" | "inactive";
+  active?: "all" | "active" | "inactive" | "archived";
   stock?: "all" | "in-stock" | "low-stock" | "out-of-stock";
   page?: number;
 };
@@ -38,6 +38,7 @@ export type AdminProductListRow = {
   isFeatured: boolean;
   isNew: boolean;
   badgeLabel: string | null;
+  deletedAt: Date | null;
 };
 
 export type AdminLookupOption = { id: string; name: string; slug: string };
@@ -61,6 +62,7 @@ export type AdminSpecDefinition = {
   slug: string;
   name: string;
   unit: string | null;
+  values: { id: string; name: string }[];
 };
 
 export type AdminSpecGroup = {
@@ -81,6 +83,7 @@ export type AdminProductEditorData = {
   stockQuantity: number;
   stockStatus: StockState;
   isActive: boolean;
+  deletedAt: string | null;
   isFeatured: boolean;
   isNew: boolean;
   featuredSort: number | null;
@@ -104,7 +107,7 @@ export type AdminProductEditorData = {
     isActive: boolean;
     optionIds: string[];
   }[];
-  specifications: { specificationId: string; value: string }[];
+  specifications: { specificationId: string; valueId: string; value: string }[];
 };
 
 export type AdminProductTranslation = {
@@ -169,6 +172,7 @@ export async function getAdminCatalogLookups(): Promise<{
   categories: AdminLookupOption[];
   variantAttributes: AdminVariantAttribute[];
   specGroups: AdminSpecGroup[];
+  specDefinitions: AdminSpecDefinition[];
 }> {
   const [filters, attributes, groups] = await Promise.all([
     listAdminFilterOptions(),
@@ -182,7 +186,10 @@ export async function getAdminCatalogLookups(): Promise<{
     prisma.specificationGroup.findMany({
       include: {
         translations: true,
-        definitions: { include: { translations: true }, orderBy: { sortOrder: "asc" } },
+        definitions: {
+          include: { translations: true, libraryValues: { include: { translations: true }, orderBy: { sortOrder: "asc" } } },
+          orderBy: { sortOrder: "asc" },
+        },
       },
       orderBy: { sortOrder: "asc" },
     }),
@@ -210,8 +217,24 @@ export async function getAdminCatalogLookups(): Promise<{
         slug: definition.slug,
         name: pickTranslation(definition.translations).name,
         unit: definition.unit,
+        values: definition.libraryValues.map((value) => ({
+          id: value.id,
+          name: pickTranslation(value.translations).name,
+        })),
       })),
     })),
+    specDefinitions: groups.flatMap((group) =>
+      group.definitions.map((definition) => ({
+        id: definition.id,
+        slug: definition.slug,
+        name: pickTranslation(definition.translations).name,
+        unit: definition.unit,
+        values: definition.libraryValues.map((value) => ({
+          id: value.id,
+          name: pickTranslation(value.translations).name,
+        })),
+      })),
+    ),
   };
 }
 
@@ -227,8 +250,13 @@ function productListWhere(filters: AdminProductListFilters): Prisma.ProductWhere
   }
   if (filters.categoryId) where.categoryId = filters.categoryId;
   if (filters.brandId) where.brandId = filters.brandId;
-  if (filters.active === "active") where.isActive = true;
-  if (filters.active === "inactive") where.isActive = false;
+  if (filters.active === "archived") {
+    where.deletedAt = { not: null };
+  } else {
+    where.deletedAt = null;
+    if (filters.active === "active") where.isActive = true;
+    if (filters.active === "inactive") where.isActive = false;
+  }
   if (filters.stock === "out-of-stock") {
     where.stockQuantity = { lte: 0 };
   } else if (filters.stock === "low-stock") {
@@ -290,6 +318,7 @@ export async function listAdminProducts(filters: AdminProductListFilters): Promi
       isFeatured: product.isFeatured,
       isNew: product.isNew,
       badgeLabel: product.badgeLabel,
+      deletedAt: product.deletedAt,
     };
   });
 
@@ -351,6 +380,7 @@ export async function getAdminProductEditor(id: string): Promise<AdminProductEdi
     stockQuantity: product.stockQuantity,
     stockStatus: stockStateFromQuantity(product.stockQuantity),
     isActive: product.isActive,
+    deletedAt: product.deletedAt?.toISOString() ?? null,
     isFeatured: product.isFeatured,
     isNew: product.isNew,
     featuredSort: product.featuredSort,
@@ -382,6 +412,7 @@ export async function getAdminProductEditor(id: string): Promise<AdminProductEdi
     })),
     specifications: product.specifications.map((row) => ({
       specificationId: row.specificationId,
+      valueId: row.valueId ?? "",
       value: row.value,
     })),
   };
@@ -399,6 +430,7 @@ export function emptyProductEditor(): AdminProductEditorData {
     stockQuantity: 0,
     stockStatus: "out-of-stock",
     isActive: true,
+    deletedAt: null,
     isFeatured: false,
     isNew: false,
     featuredSort: null,

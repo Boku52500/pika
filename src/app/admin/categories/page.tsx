@@ -4,6 +4,7 @@ import { requireAdmin } from "@/server/auth/admin";
 import { listAdminCategories } from "@/server/admin/categories";
 import { Button } from "@/components/ui/Button";
 import { ActiveToggle } from "@/components/admin/ActiveToggle";
+import { MainNavToggle } from "@/components/admin/MainNavToggle";
 
 export const metadata: Metadata = { title: "კატეგორიები" };
 
@@ -29,6 +30,8 @@ export default async function AdminCategoriesPage() {
               <tr>
                 <th className="px-3 py-2.5 font-medium">დასახელება</th>
                 <th className="px-3 py-2.5 font-medium">Slug</th>
+                <th className="px-3 py-2.5 font-medium">ნავიგაცია</th>
+                <th className="px-3 py-2.5 font-medium">რიგი</th>
                 <th className="px-3 py-2.5 font-medium">პროდუქტები</th>
                 <th className="px-3 py-2.5 font-medium">სტატუსი</th>
                 <th className="px-3 py-2.5 font-medium"> </th>
@@ -41,6 +44,8 @@ export default async function AdminCategoriesPage() {
                     {row.name}
                   </td>
                   <td className="px-3 py-2.5 text-text-muted">{row.slug}</td>
+                  <td className="px-3 py-2.5">{row.showInMainNav ? "მთავარ ნავიგაციაში" : "—"}</td>
+                  <td className="tnum px-3 py-2.5">{row.showInMainNav ? row.navSortOrder : row.sortOrder}</td>
                   <td className="tnum px-3 py-2.5">{row.productCount}</td>
                   <td className="px-3 py-2.5">{row.isActive ? "აქტიური" : "გამორთული"}</td>
                   <td className="px-3 py-2.5">
@@ -48,6 +53,9 @@ export default async function AdminCategoriesPage() {
                       <Link href={`/admin/categories/${row.id}`} className="font-medium text-brand-700 hover:underline">
                         რედაქტირება
                       </Link>
+                      {row.parentId == null ? (
+                        <MainNavToggle id={row.id} showInMainNav={row.showInMainNav} />
+                      ) : null}
                       <ActiveToggle id={row.id} isActive={row.isActive} kind="category" />
                     </div>
                   </td>

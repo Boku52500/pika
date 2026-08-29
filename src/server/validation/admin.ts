@@ -69,7 +69,9 @@ export const adminProductVariantSchema = z.object({
 });
 
 export const adminProductSpecSchema = z.object({
-  specificationId: z.string().trim().min(1),
+  specificationId: z.string().trim().min(1).optional().or(z.literal("")),
+  specificationName: z.string().trim().max(120).optional().default(""),
+  valueId: z.string().trim().max(64).optional().default(""),
   value: z.string().trim().max(500).optional().default(""),
 });
 
@@ -124,6 +126,8 @@ export const adminCategorySaveSchema = z.object({
   sortOrder: z.number().int().min(0).max(9999).default(0),
   isActive: z.boolean(),
   indexable: z.boolean(),
+  showInMainNav: z.boolean().optional().default(false),
+  navSortOrder: z.number().int().min(0).max(9999).optional().default(0),
   translations: z.object({
     ka: z.object({
       name: z.string().trim().min(1, "შეიყვანეთ ქართული დასახელება").max(200),
@@ -225,6 +229,49 @@ export const adminOrderStatusSchema = z.object({
 
 export const adminIdSchema = z.object({
   id: z.string().trim().min(1),
+});
+
+export const adminReusableNameSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "შეიყვანეთ დასახელება")
+    .max(80, "დასახელება ძალიან გრძელია"),
+});
+
+export const adminVariantOptionCreateSchema = z.object({
+  attributeId: z.string().trim().min(1),
+  name: z
+    .string()
+    .trim()
+    .min(1, "შეიყვანეთ ფერი")
+    .max(80, "დასახელება ძალიან გრძელია"),
+});
+
+export const adminSpecificationCreateSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "შეიყვანეთ სპეციფიკაცია")
+    .max(80, "დასახელება ძალიან გრძელია"),
+});
+
+export const adminSpecificationValueCreateSchema = z.object({
+  specificationId: z.string().trim().min(1),
+  name: z
+    .string()
+    .trim()
+    .min(1, "შეიყვანეთ მნიშვნელობა")
+    .max(80, "მნიშვნელობა ძალიან გრძელია"),
+});
+
+export const adminSpecificationRenameSchema = z.object({
+  id: z.string().trim().min(1),
+  name: z
+    .string()
+    .trim()
+    .min(1, "შეიყვანეთ დასახელება")
+    .max(80, "დასახელება ძალიან გრძელია"),
 });
 
 export type AdminProductSaveInput = z.infer<typeof adminProductSaveSchema>;

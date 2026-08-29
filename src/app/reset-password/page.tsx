@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Header } from "@/components/layout/Header";
+import { StorefrontHeader } from "@/components/layout/StorefrontHeader";
 import { Footer } from "@/components/layout/Footer";
 import { ResetPasswordPageClient } from "@/components/auth/ResetPasswordPageClient";
 import { noIndexMetadata } from "@/lib/seo";
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function ResetPasswordPage() {
   return (
     <>
-      <Header />
+      <StorefrontHeader />
       <main className="flex-1">
         <Suspense>
           <ResetPasswordPageClient />

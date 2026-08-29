@@ -1,4 +1,4 @@
-import { Header } from "@/components/layout/Header";
+import { StorefrontHeader } from "@/components/layout/StorefrontHeader";
 import { Footer } from "@/components/layout/Footer";
 import { Hero } from "@/components/home/Hero";
 import { CategoryShortcuts } from "@/components/home/CategoryShortcuts";
@@ -30,7 +30,7 @@ export default async function Home() {
           telephone: "+995322000000",
         }}
       />
-      <Header />
+      <StorefrontHeader />
 
       <main className="flex-1">
         <Hero />

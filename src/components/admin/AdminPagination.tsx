@@ -1,6 +1,20 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function Chevron({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg viewBox="0 0 16 16" className="size-4" aria-hidden>
+      <path
+        d={direction === "left" ? "M10.5 3.5 6 8l4.5 4.5" : "M5.5 3.5 10 8 5.5 12.5"}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export function AdminPagination({
   page,
@@ -35,7 +49,7 @@ export function AdminPagination({
           page === 1 && "pointer-events-none opacity-40",
         )}
       >
-        <ChevronLeft className="size-4" />
+        <Chevron direction="left" />
       </Link>
       {items.map((item, i) =>
         item === "ellipsis" ? (
@@ -66,7 +80,7 @@ export function AdminPagination({
           page === totalPages && "pointer-events-none opacity-40",
         )}
       >
-        <ChevronRight className="size-4" />
+        <Chevron direction="right" />
       </Link>
     </nav>
   );

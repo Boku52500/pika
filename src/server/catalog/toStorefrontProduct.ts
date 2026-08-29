@@ -2,7 +2,6 @@ import type {
   Category,
   Product,
   ProductAvailability,
-  ProductBadgeKind,
   ProductImageData,
   ProductInstallment,
   ProductSpecGroup,
@@ -27,7 +26,6 @@ const PRODUCT_VISUALS: readonly ProductVisual[] = [
   "network",
 ];
 
-const BADGE_KINDS: readonly ProductBadgeKind[] = ["bestseller", "top-seller", "limited", "custom"];
 const AVAILABILITY: readonly ProductAvailability[] = ["in-stock", "low-stock", "out-of-stock"];
 
 function isProductVisual(value: string): value is ProductVisual {
@@ -130,14 +128,8 @@ function cardInstallment(options: ProductInstallment[]): ProductInstallment | un
   return options.reduce((longest, term) => (term.months > longest.months ? term : longest));
 }
 
-function mapBadge(product: CatalogProduct): Product["badge"] {
-  if (!product.badgeKind || !(BADGE_KINDS as readonly string[]).includes(product.badgeKind)) {
-    return undefined;
-  }
-  return {
-    kind: product.badgeKind as ProductBadgeKind,
-    label: product.badgeLabel ?? undefined,
-  };
+function mapBadge(): Product["badge"] {
+  return undefined;
 }
 
 /**
@@ -169,7 +161,7 @@ export function toStorefrontProduct(product: CatalogProduct): Product {
     installmentOptions: installmentOptions.length ? installmentOptions : undefined,
     availability: mapAvailability(product),
     isNew: product.isNew || undefined,
-    badge: mapBadge(product),
+    badge: mapBadge(),
     storage: product.storageLabel ?? specValue(product, "storage"),
     ram: product.ramLabel ?? specValue(product, "ram"),
     sku: product.sku,

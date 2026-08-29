@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Header } from "@/components/layout/Header";
+import { StorefrontHeader } from "@/components/layout/StorefrontHeader";
 import { Footer } from "@/components/layout/Footer";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function ForbiddenPage() {
   return (
     <>
-      <Header />
+      <StorefrontHeader />
       <main className="flex-1">
         <Container className="py-16">
           <h1 className="text-h2 text-text">წვდომა აკრძალულია</h1>

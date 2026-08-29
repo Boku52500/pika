@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Header } from "@/components/layout/Header";
+import { StorefrontHeader } from "@/components/layout/StorefrontHeader";
 import { Footer } from "@/components/layout/Footer";
 import { ForgotPasswordPageClient } from "@/components/auth/ForgotPasswordPageClient";
 import { noIndexMetadata } from "@/lib/seo";
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function ForgotPasswordPage() {
   return (
     <>
-      <Header />
+      <StorefrontHeader />
       <main className="flex-1">
         <ForgotPasswordPageClient />
       </main>
