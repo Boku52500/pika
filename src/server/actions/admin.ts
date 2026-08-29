@@ -21,7 +21,6 @@ import {
   adminVariantOptionCreateSchema,
 } from "@/server/validation/admin";
 import { parseMoneyInput } from "@/server/money";
-import { stockStateFromQuantity } from "@/server/admin/stock";
 import { categoryWouldCycle } from "@/server/admin/categories";
 import { productArchiveData, productRestoreData } from "@/server/admin/productArchive";
 import { createReusableVariantOption } from "@/server/admin/variantOptions";
@@ -152,7 +151,7 @@ export async function saveAdminProduct(input: unknown): Promise<ActionResult<{ i
   const price = parseMoneyInput(data.price);
   const previousPrice = parseOptionalMoney(data.previousPrice);
   const badgeKind = emptyToNull(data.badgeKind);
-  const stockStatus = data.stockStatus ?? stockStateFromQuantity(data.stockQuantity);
+  const stockStatus = data.isActive ? "in-stock" : "out-of-stock";
 
   try {
     const [brand, category] = await Promise.all([
@@ -172,7 +171,7 @@ export async function saveAdminProduct(input: unknown): Promise<ActionResult<{ i
         categoryId: data.categoryId,
         price,
         previousPrice,
-        stockQuantity: data.stockQuantity,
+        stockQuantity: 0,
         stockStatus,
         isActive: data.isActive,
         isFeatured: data.isFeatured,
@@ -270,7 +269,7 @@ export async function saveAdminProduct(input: unknown): Promise<ActionResult<{ i
               data: {
                 sku: variant.sku,
                 priceOverride,
-                stockQuantity: variant.stockQuantity,
+                stockQuantity: 0,
                 isActive: variant.isActive,
               },
             })
@@ -279,7 +278,7 @@ export async function saveAdminProduct(input: unknown): Promise<ActionResult<{ i
                 productId: product.id,
                 sku: variant.sku,
                 priceOverride,
-                stockQuantity: variant.stockQuantity,
+                stockQuantity: 0,
                 isActive: variant.isActive,
               },
             });

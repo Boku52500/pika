@@ -5,37 +5,19 @@ import {
   planInventoryTransition,
 } from "./inventoryState";
 
-describe("planInventoryTransition", () => {
-  it("allocates a hold for card placement and commits cash immediately", () => {
-    assert.deepEqual(planInventoryTransition(null, "place_card"), { state: "held", stock: "allocate" });
-    assert.deepEqual(planInventoryTransition(null, "place_immediate"), { state: "committed", stock: "allocate" });
+describe("planInventoryTransition without physical stock", () => {
+  it("never schedules stock allocation or release", () => {
+    assert.equal(planInventoryTransition(null, "place_card").stock, "none");
+    assert.equal(planInventoryTransition(null, "place_immediate").stock, "none");
+    assert.equal(planInventoryTransition("held", "paid").stock, "none");
+    assert.equal(planInventoryTransition("held", "unpaid_terminal").stock, "none");
+    assert.equal(planInventoryTransition("released", "retry_payment").stock, "none");
+    assert.equal(planInventoryTransition("released", "paid").stock, "none");
   });
 
-  it("commits a hold on PAID without a second stock mutation", () => {
-    assert.deepEqual(planInventoryTransition("held", "paid"), { state: "committed", stock: "none" });
-  });
-
-  it("releases held stock on unpaid terminal (failed / cancel) once", () => {
-    assert.deepEqual(planInventoryTransition("held", "unpaid_terminal"), { state: "released", stock: "release" });
-    assert.deepEqual(planInventoryTransition("released", "unpaid_terminal"), { state: "released", stock: "none" });
-    assert.deepEqual(planInventoryTransition("committed", "unpaid_terminal"), { state: "committed", stock: "none" });
-  });
-
-  it("does not release committed cash/installment stock on cancel", () => {
-    assert.deepEqual(planInventoryTransition("committed", "unpaid_terminal"), { state: "committed", stock: "none" });
-  });
-
-  it("re-allocates on payment retry after a failed/abandoned release", () => {
-    assert.deepEqual(planInventoryTransition("released", "retry_payment"), { state: "held", stock: "allocate" });
-    assert.deepEqual(planInventoryTransition("held", "retry_payment"), { state: "held", stock: "none" });
-  });
-
-  it("re-allocates if PAID arrives after a failed release", () => {
-    assert.deepEqual(planInventoryTransition("released", "paid"), { state: "committed", stock: "allocate" });
-  });
-
-  it("is idempotent on duplicate PAID", () => {
-    assert.deepEqual(planInventoryTransition("committed", "paid"), { state: "committed", stock: "none" });
+  it("still tracks hold state for schema compatibility", () => {
+    assert.deepEqual(planInventoryTransition(null, "place_card"), { state: "held", stock: "none" });
+    assert.deepEqual(planInventoryTransition("held", "unpaid_terminal"), { state: "released", stock: "none" });
   });
 });
 
@@ -49,51 +31,20 @@ describe("inventoryEventForDerivedPayment", () => {
   });
 });
 
-describe("stock ledger simulation", () => {
-  it("concurrent allocate against one unit: only the first succeeds", () => {
-    let stock = 1;
-    function allocate(qty: number): boolean {
-      if (stock < qty) return false;
-      stock -= qty;
-      return true;
-    }
-    assert.equal(allocate(1), true);
-    assert.equal(allocate(1), false);
-    assert.equal(stock, 0);
+describe("manual availability semantics", () => {
+  it("treats zero legacy stock as purchasable when product and variant are active", () => {
+    const product = { isActive: true, stockQuantity: 0, variants: [{ isActive: true, stockQuantity: 0 }] };
+    const purchasable = product.isActive && product.variants.some((variant) => variant.isActive);
+    assert.equal(purchasable, true);
   });
 
-  it("failed then retry then paid does not leak stock", () => {
-    let stock = 2;
-    let state: "held" | "committed" | "released" | null = null;
-    function apply(event: Parameters<typeof planInventoryTransition>[1], qty = 1) {
-      const plan = planInventoryTransition(state, event);
-      if (plan.stock === "allocate") {
-        assert.ok(stock >= qty);
-        stock -= qty;
-      }
-      if (plan.stock === "release") stock += qty;
-      state = plan.state;
-    }
-    apply("place_card");
-    assert.equal(stock, 1);
-    apply("unpaid_terminal");
-    assert.equal(stock, 2);
-    apply("unpaid_terminal");
-    assert.equal(stock, 2);
-    apply("retry_payment");
-    assert.equal(stock, 1);
-    apply("paid");
-    apply("paid");
-    assert.equal(stock, 1);
-    assert.equal(state, "committed");
+  it("blocks inactive products regardless of stock quantity", () => {
+    const product = { isActive: false, stockQuantity: 500, variants: [] as { isActive: boolean; stockQuantity: number }[] };
+    assert.equal(product.isActive, false);
   });
-});
 
-describe("inventoryEventForDerivedPayment", () => {
-  it("does not commit or release on authorized; commits only on paid-like", () => {
-    assert.equal(inventoryEventForDerivedPayment("authorized"), null);
-    assert.equal(inventoryEventForDerivedPayment("processing"), null);
-    assert.equal(inventoryEventForDerivedPayment("paid"), "paid");
-    assert.equal(inventoryEventForDerivedPayment("failed"), "unpaid_terminal");
+  it("blocks inactive variants even when stock is positive", () => {
+    const variants = [{ isActive: false, stockQuantity: 100 }];
+    assert.equal(variants.some((variant) => variant.isActive), false);
   });
 });

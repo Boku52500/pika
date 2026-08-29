@@ -39,11 +39,13 @@ describe("category navigation", () => {
     assert.equal(nav.some((item) => item.id === "inactive"), false);
   });
 
-  it("leaves the main navbar empty when no category is flagged for it", () => {
+  it("falls back to active top-level categories when none are flagged for main nav", () => {
+    const nav = selectMainNavItems(rows.map((row) => ({ ...row, showInMainNav: false })));
     assert.deepEqual(
-      selectMainNavItems(rows.map((row) => ({ ...row, showInMainNav: false }))),
-      [],
+      nav.map((item) => item.slug),
+      ["phones", "laptops", "hidden"],
     );
+    assert.equal(nav.some((item) => item.slug === "apple"), false);
   });
 
   it("protects against self-parent and descendant cycles", () => {

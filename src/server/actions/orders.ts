@@ -19,7 +19,6 @@ import { bogConfigured, BOG_NOT_CONFIGURED_MESSAGE } from "@/server/payments/bog
 import { createPendingCardPayment, PaymentUserError, startBogPaymentForOrder } from "@/server/payments/initiate";
 import { scheduleEmail } from "@/server/email/schedule";
 import { notifyOrderConfirmation } from "@/server/email/notify";
-import { applyStockMutation, InventoryUserError } from "@/server/commerce/inventory";
 import { placePromotionRedemption, PromoUserError } from "@/server/commerce/promoRedemption";
 import { isPaidLikePaymentStatus } from "@/server/commerce/inventoryState";
 import { isOnlineBogMethod } from "@/server/payments/methods";
@@ -138,9 +137,6 @@ async function continueCardPayment(
     };
   } catch (error) {
     if (error instanceof PaymentUserError) {
-      return { ok: false as const, message: error.message, orderNumber };
-    }
-    if (error instanceof InventoryUserError) {
       return { ok: false as const, message: error.message, orderNumber };
     }
     logError("order.payment_start_failed", { error, orderNumber });
@@ -276,7 +272,6 @@ export async function createOrder(
 
         let unitPrice = moneyToNumber(product.price);
         let sku = product.sku;
-        let stock = product.stockQuantity;
         let variantId: string | null = null;
         let axes: Array<{ attributeSlug: string; attributeLabel: string; optionSlug: string; optionLabel: string }> =
           [];
@@ -288,7 +283,6 @@ export async function createOrder(
           }
           variantId = match.id;
           sku = match.sku;
-          stock = match.stockQuantity;
           unitPrice = moneyToNumber(match.priceOverride ?? product.price);
           axes = match.options.map((entry) => ({
             attributeSlug: entry.option.attribute.slug,
@@ -296,10 +290,6 @@ export async function createOrder(
             optionSlug: entry.option.slug,
             optionLabel: pickName(entry.option.translations, entry.option.slug),
           }));
-        }
-
-        if (item.quantity > stock) {
-          throw new OrderUserError(`სამწუხაროდ, ${productName} ამჟამად არ არის საკმარისი რაოდენობით.`);
         }
 
         lineSnapshots.push({
@@ -319,16 +309,6 @@ export async function createOrder(
           variantId,
         });
       }
-
-      await applyStockMutation(
-        tx,
-        lineSnapshots.map((line) => ({
-          productId: line.productId,
-          variantId: line.variantId,
-          quantity: line.quantity,
-        })),
-        "allocate",
-      );
 
       const subtotal = round2(lineSnapshots.reduce((sum, line) => sum + line.lineTotal, 0));
       let discount = 0;
@@ -450,7 +430,7 @@ export async function createOrder(
       });
       if (replay) return replayExistingCheckout(replay, await bogStartOptions(payload, session?.id ?? null));
     }
-    if (error instanceof OrderUserError || error instanceof PromoUserError || error instanceof InventoryUserError) {
+    if (error instanceof OrderUserError || error instanceof PromoUserError) {
       return { ok: false, message: error.message };
     }
     logError("order.create_failed", { error });

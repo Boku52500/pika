@@ -29,8 +29,7 @@ export const productListInclude = {
     include: { translations: true },
   },
   variants: {
-    where: { isActive: true },
-    select: { stockQuantity: true },
+    select: { isActive: true },
   },
   installmentTerms: { orderBy: { months: "desc" as const }, take: 1 },
 } satisfies Prisma.ProductInclude;

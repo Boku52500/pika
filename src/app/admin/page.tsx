@@ -15,8 +15,7 @@ export default async function AdminDashboardPage() {
   const metrics = [
     { label: "პროდუქტები", value: data.productCount },
     { label: "აქტიური პროდუქტები", value: data.activeProductCount },
-    { label: "მარაგი იწურება", value: data.lowStockCount },
-    { label: "მარაგში არ არის", value: data.outOfStockCount },
+    { label: "გამოუწვდომელი პროდუქტები", value: data.unavailableProductCount },
     { label: "შეკვეთები", value: data.orderCount },
     { label: "დასამუშავებელი შეკვეთები", value: data.pendingOrderCount },
   ];

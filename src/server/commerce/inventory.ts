@@ -25,66 +25,24 @@ export async function lockOrderRow(tx: Prisma.TransactionClient, orderId: string
   await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
 }
 
+/** No-op — numeric stock is not managed. Kept for call-site compatibility. */
 export async function applyStockMutation(
-  tx: Prisma.TransactionClient,
-  lines: StockLine[],
-  mutation: "allocate" | "release",
+  ..._args: [Prisma.TransactionClient, StockLine[], "allocate" | "release"]
 ): Promise<void> {
-  for (const line of lines) {
-    if (line.quantity <= 0) continue;
-    if (line.variantId) {
-      if (mutation === "allocate") {
-        const updated = await tx.productVariant.updateMany({
-          where: { id: line.variantId, stockQuantity: { gte: line.quantity } },
-          data: { stockQuantity: { decrement: line.quantity } },
-        });
-        if (updated.count !== 1) {
-          throw new InventoryUserError("სამწუხაროდ, ერთ-ერთი პროდუქტი ამჟამად არ არის საკმარისი რაოდენობით.");
-        }
-      } else {
-        await tx.productVariant.updateMany({
-          where: { id: line.variantId },
-          data: { stockQuantity: { increment: line.quantity } },
-        });
-      }
-      continue;
-    }
-    if (!line.productId) continue;
-    if (mutation === "allocate") {
-      const updated = await tx.product.updateMany({
-        where: { id: line.productId, stockQuantity: { gte: line.quantity } },
-        data: { stockQuantity: { decrement: line.quantity } },
-      });
-      if (updated.count !== 1) {
-        throw new InventoryUserError("სამწუხაროდ, ერთ-ერთი პროდუქტი ამჟამად არ არის საკმარისი რაოდენობით.");
-      }
-    } else {
-      await tx.product.updateMany({
-        where: { id: line.productId },
-        data: { stockQuantity: { increment: line.quantity } },
-      });
-    }
-  }
+  void _args;
 }
 
 export async function applyInventoryEvent(
   tx: Prisma.TransactionClient,
   orderId: string,
   event: "place_card" | "place_immediate" | "paid" | "unpaid_terminal" | "retry_payment",
-  lines?: StockLine[],
 ): Promise<InventoryHoldState> {
   await lockOrderRow(tx, orderId);
   const order = await tx.order.findUniqueOrThrow({
     where: { id: orderId },
-    select: {
-      inventoryState: true,
-      items: { select: { productId: true, variantId: true, quantity: true } },
-    },
+    select: { inventoryState: true },
   });
   const plan = planInventoryTransition(order.inventoryState, event);
-  if (plan.stock !== "none") {
-    await applyStockMutation(tx, lines ?? order.items, plan.stock);
-  }
   if (plan.state !== order.inventoryState) {
     await tx.order.update({
       where: { id: orderId },

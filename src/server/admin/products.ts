@@ -4,11 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/db";
 import { DEFAULT_LOCALE, pickTranslation } from "@/server/locale";
 import { moneyToNumber } from "@/server/money";
-import {
-  effectiveStockQuantity,
-  stockStateFromQuantity,
-  type StockState,
-} from "@/server/admin/stock";
+import type { StockState } from "@/server/admin/stock";
 
 export const ADMIN_PAGE_SIZE = 20;
 
@@ -17,7 +13,7 @@ export type AdminProductListFilters = {
   categoryId?: string;
   brandId?: string;
   active?: "all" | "active" | "inactive" | "archived";
-  stock?: "all" | "in-stock" | "low-stock" | "out-of-stock";
+  stock?: "all" | "in-stock" | "out-of-stock";
   page?: number;
 };
 
@@ -32,7 +28,6 @@ export type AdminProductListRow = {
   categoryName: string;
   price: number;
   previousPrice: number | null;
-  stockQuantity: number;
   stockState: StockState;
   isActive: boolean;
   isFeatured: boolean;
@@ -258,11 +253,9 @@ function productListWhere(filters: AdminProductListFilters): Prisma.ProductWhere
     if (filters.active === "inactive") where.isActive = false;
   }
   if (filters.stock === "out-of-stock") {
-    where.stockQuantity = { lte: 0 };
-  } else if (filters.stock === "low-stock") {
-    where.stockQuantity = { gt: 0, lte: 3 };
+    where.isActive = false;
   } else if (filters.stock === "in-stock") {
-    where.stockQuantity = { gt: 3 };
+    where.isActive = true;
   }
   return where;
 }
@@ -287,7 +280,7 @@ export async function listAdminProducts(filters: AdminProductListFilters): Promi
         brand: { include: { translations: true } },
         category: { include: { translations: true } },
         images: { orderBy: { sortOrder: "asc" }, take: 1, include: { translations: true } },
-        variants: { select: { stockQuantity: true } },
+        variants: { select: { isActive: true } },
       },
       orderBy: { updatedAt: "desc" },
       skip: (page - 1) * pageSize,
@@ -296,11 +289,8 @@ export async function listAdminProducts(filters: AdminProductListFilters): Promi
   ]);
 
   const rows: AdminProductListRow[] = products.map((product) => {
-    const stockQuantity = effectiveStockQuantity(
-      product.stockQuantity,
-      product.variants.map((variant) => variant.stockQuantity),
-    );
     const image = product.images[0];
+    const stockState: StockState = product.isActive ? "in-stock" : "out-of-stock";
     return {
       id: product.id,
       sku: product.sku,
@@ -312,8 +302,7 @@ export async function listAdminProducts(filters: AdminProductListFilters): Promi
       categoryName: pickTranslation(product.category.translations).name,
       price: moneyToNumber(product.price),
       previousPrice: product.previousPrice == null ? null : moneyToNumber(product.previousPrice),
-      stockQuantity,
-      stockState: stockStateFromQuantity(stockQuantity),
+      stockState,
       isActive: product.isActive,
       isFeatured: product.isFeatured,
       isNew: product.isNew,
@@ -377,8 +366,8 @@ export async function getAdminProductEditor(id: string): Promise<AdminProductEdi
     categoryId: product.categoryId,
     price: moneyInput(product.price),
     previousPrice: moneyInput(product.previousPrice),
-    stockQuantity: product.stockQuantity,
-    stockStatus: stockStateFromQuantity(product.stockQuantity),
+    stockQuantity: 0,
+    stockStatus: product.isActive ? "in-stock" : "out-of-stock",
     isActive: product.isActive,
     deletedAt: product.deletedAt?.toISOString() ?? null,
     isFeatured: product.isFeatured,

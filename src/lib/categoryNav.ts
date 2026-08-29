@@ -60,18 +60,32 @@ export function buildCategoryNavTree(rows: CategoryNavFlat[]): CategoryNavNode[]
   return walk(null);
 }
 
+const MAIN_NAV_FALLBACK_LIMIT = 6;
+
+function toMainNavItem(row: CategoryNavFlat): MainNavItem {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    href: categoryHref(row.slug),
+    highlight: row.slug === "deals",
+  };
+}
+
 /** Categories the admin marked for the one-line navbar, in nav order. */
 export function selectMainNavItems(rows: CategoryNavFlat[]): MainNavItem[] {
-  return rows
+  const configured = rows
     .filter((row) => row.isActive && row.showInMainNav)
     .sort((a, b) => a.navSortOrder - b.navSortOrder || a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "ka"))
-    .map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      name: row.name,
-      href: categoryHref(row.slug),
-      highlight: row.slug === "deals",
-    }));
+    .map(toMainNavItem);
+
+  if (configured.length > 0) return configured;
+
+  return rows
+    .filter((row) => row.isActive && row.parentId === null)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "ka"))
+    .slice(0, MAIN_NAV_FALLBACK_LIMIT)
+    .map(toMainNavItem);
 }
 
 /** Walk parent pointers in memory — used by tests and as a cycle-check primitive. */

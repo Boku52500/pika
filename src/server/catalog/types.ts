@@ -61,6 +61,7 @@ export type CatalogProductVariant = {
   sku: string;
   price: number;
   stockQuantity: number;
+  isActive: boolean;
   inStock: boolean;
   options: CatalogVariantOption[];
 };

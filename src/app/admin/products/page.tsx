@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/Button";
 import { AdminPagination } from "@/components/admin/AdminPagination";
 import { adminInputClass, adminSelectClass } from "@/components/admin/adminUi";
 import { formatPrice } from "@/lib/utils";
-import { STOCK_STATE_LABEL } from "@/lib/adminLabels";
 import { AdminProductDeleteButton } from "@/components/admin/AdminProductDeleteButton";
 
 export const metadata: Metadata = { title: "პროდუქტები" };
@@ -26,7 +25,7 @@ export default async function AdminProductsPage({
   const categoryId = param(params.category);
   const brandId = param(params.brand);
   const active = (param(params.active) || "all") as "all" | "active" | "inactive" | "archived";
-  const stock = (param(params.stock) || "all") as "all" | "in-stock" | "low-stock" | "out-of-stock";
+  const stock = (param(params.stock) || "all") as "all" | "in-stock" | "out-of-stock";
   const page = Math.max(1, Number(param(params.page) || "1") || 1);
 
   const [{ rows, total, totalPages }, filters] = await Promise.all([
@@ -98,12 +97,11 @@ export default async function AdminProductsPage({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[0.8125rem] font-medium">მარაგი</span>
+          <span className="text-[0.8125rem] font-medium">ხელმისაწვდომობა</span>
           <select name="stock" defaultValue={stock} className={adminSelectClass}>
             <option value="all">ყველა</option>
-            <option value="in-stock">მარაგშია</option>
-            <option value="low-stock">მარაგი იწურება</option>
-            <option value="out-of-stock">მარაგში არ არის</option>
+            <option value="in-stock">ხელმისაწვდომია</option>
+            <option value="out-of-stock">გამოუწვდომელი</option>
           </select>
         </label>
         <div className="flex items-end">
@@ -125,8 +123,7 @@ export default async function AdminProductsPage({
                 <th className="px-3 py-2.5 font-medium">ბრენდი</th>
                 <th className="px-3 py-2.5 font-medium">კატეგორია</th>
                 <th className="px-3 py-2.5 font-medium">ფასი</th>
-                <th className="px-3 py-2.5 font-medium">მარაგი</th>
-                <th className="px-3 py-2.5 font-medium">სტატუსი</th>
+                <th className="px-3 py-2.5 font-medium">ხელმისაწვდომობა</th>
                 <th className="px-3 py-2.5 font-medium"> </th>
               </tr>
             </thead>
@@ -165,11 +162,7 @@ export default async function AdminProductsPage({
                     ) : null}
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className="tnum">{row.stockQuantity}</span>
-                    <span className="block text-label text-text-faint">{STOCK_STATE_LABEL[row.stockState]}</span>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {row.deletedAt ? "არქივი" : row.isActive ? "აქტიური" : "გამორთული"}
+                    {row.deletedAt ? "არქივი" : row.isActive ? "ხელმისაწვდომია" : "გამოუწვდომელი"}
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex flex-col items-start gap-1">

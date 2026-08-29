@@ -72,7 +72,7 @@ type ProductListRecord = Product & {
   category: CategoryWithTranslations;
   images: (ProductImage & { translations: ProductImageTranslation[] })[];
   highlights: (ProductHighlight & { translations: ProductHighlightTranslation[] })[];
-  variants: { stockQuantity: number }[];
+  variants: { isActive: boolean }[];
   installmentTerms: ProductInstallmentTerm[];
 };
 
@@ -118,11 +118,10 @@ export function mapCategory(
   };
 }
 
-function effectiveStock(product: ProductRecord): number {
-  if (product.variants.length > 0) {
-    return product.variants.reduce((sum, variant) => sum + variant.stockQuantity, 0);
-  }
-  return product.stockQuantity;
+function productIsPurchasable(product: { isActive: boolean; variants: { isActive: boolean }[] }): boolean {
+  if (!product.isActive) return false;
+  if (product.variants.length === 0) return true;
+  return product.variants.some((variant) => variant.isActive);
 }
 
 function mapImages(
@@ -172,7 +171,8 @@ function mapVariants(product: ProductRecord, locale: AppLocale): CatalogProductV
       sku: variant.sku,
       price,
       stockQuantity: variant.stockQuantity,
-      inStock: variant.stockQuantity > 0,
+      isActive: variant.isActive,
+      inStock: variant.isActive,
       options: variant.options.map((selection) => ({
         attributeSlug: selection.option.attribute.slug,
         attributeName: pickTranslation(selection.option.attribute.translations, locale).name,
@@ -184,16 +184,9 @@ function mapVariants(product: ProductRecord, locale: AppLocale): CatalogProductV
   });
 }
 
-function effectiveListStock(product: ProductListRecord): number {
-  if (product.variants.length > 0) {
-    return product.variants.reduce((sum, variant) => sum + variant.stockQuantity, 0);
-  }
-  return product.stockQuantity;
-}
-
 export function mapProductList(product: ProductListRecord, locale: AppLocale = DEFAULT_LOCALE): CatalogProduct {
   const t = pickTranslation(product.translations, locale);
-  const stockQuantity = effectiveListStock(product);
+  const purchasable = productIsPurchasable(product);
 
   return {
     id: product.id,
@@ -210,8 +203,8 @@ export function mapProductList(product: ProductListRecord, locale: AppLocale = D
     },
     price: moneyToNumber(product.price),
     previousPrice: product.previousPrice == null ? null : moneyToNumber(product.previousPrice),
-    stockQuantity,
-    inStock: stockQuantity > 0,
+    stockQuantity: purchasable ? 1 : 0,
+    inStock: purchasable,
     isActive: product.isActive,
     isFeatured: product.isFeatured,
     isNew: product.isNew,
@@ -254,7 +247,7 @@ export function mapProductList(product: ProductListRecord, locale: AppLocale = D
 
 export function mapProduct(product: ProductRecord, locale: AppLocale = DEFAULT_LOCALE): CatalogProduct {
   const t = pickTranslation(product.translations, locale);
-  const stockQuantity = effectiveStock(product);
+  const purchasable = productIsPurchasable(product);
 
   return {
     id: product.id,
@@ -271,8 +264,8 @@ export function mapProduct(product: ProductRecord, locale: AppLocale = DEFAULT_L
     },
     price: moneyToNumber(product.price),
     previousPrice: product.previousPrice == null ? null : moneyToNumber(product.previousPrice),
-    stockQuantity,
-    inStock: stockQuantity > 0,
+    stockQuantity: purchasable ? 1 : 0,
+    inStock: purchasable,
     isActive: product.isActive,
     isFeatured: product.isFeatured,
     isNew: product.isNew,

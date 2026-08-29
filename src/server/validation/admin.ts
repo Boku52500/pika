@@ -63,7 +63,7 @@ export const adminProductVariantSchema = z.object({
   id: z.string().trim().optional(),
   sku: z.string().trim().min(1, "შეიყვანეთ ვარიანტის SKU").max(64, "SKU ძალიან გრძელია"),
   priceOverride: optionalMoneyField(),
-  stockQuantity: z.number().int("მარაგი უნდა იყოს მთელი რიცხვი").min(0, "მარაგი არ შეიძლება იყოს უარყოფითი"),
+  stockQuantity: z.number().int().min(0).optional().default(0),
   isActive: z.boolean(),
   optionIds: z.array(z.string().trim().min(1)).default([]),
 });
@@ -84,7 +84,7 @@ export const adminProductSaveSchema = z
     categoryId: z.string().trim().min(1, "აირჩიეთ კატეგორია"),
     price: moneyField("შეიყვანეთ ფასი"),
     previousPrice: optionalMoneyField(),
-    stockQuantity: z.number().int("მარაგი უნდა იყოს მთელი რიცხვი").min(0, "მარაგი არ შეიძლება იყოს უარყოფითი"),
+    stockQuantity: z.number().int().min(0).optional().default(0),
     stockStatus: z.enum(["in-stock", "low-stock", "out-of-stock"]).optional(),
     isActive: z.boolean(),
     isFeatured: z.boolean(),

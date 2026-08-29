@@ -8,7 +8,6 @@ import {
   isRefundablePaymentStatus,
   remainingRefundableTetri,
 } from "@/server/payments/refundable";
-import { LOW_STOCK_THRESHOLD } from "@/server/admin/stock";
 import type { OrderStatus, PaymentStatus } from "@/generated/prisma/client";
 
 export async function getAdminDashboard() {
@@ -17,8 +16,7 @@ export async function getAdminDashboard() {
   const [
     productCount,
     activeProductCount,
-    lowStockCount,
-    outOfStockCount,
+    unavailableProductCount,
     orderCount,
     pendingOrderCount,
     recentOrders,
@@ -26,10 +24,7 @@ export async function getAdminDashboard() {
   ] = await Promise.all([
     prisma.product.count(),
     prisma.product.count({ where: { isActive: true, deletedAt: null } }),
-    prisma.product.count({
-      where: { stockQuantity: { gt: 0, lte: LOW_STOCK_THRESHOLD } },
-    }),
-    prisma.product.count({ where: { stockQuantity: { lte: 0 } } }),
+    prisma.product.count({ where: { isActive: false, deletedAt: null } }),
     prisma.order.count(),
     prisma.order.count({ where: { orderStatus: { in: pendingStatuses } } }),
     prisma.order.findMany({
@@ -47,8 +42,7 @@ export async function getAdminDashboard() {
   return {
     productCount,
     activeProductCount,
-    lowStockCount,
-    outOfStockCount,
+    unavailableProductCount,
     orderCount,
     pendingOrderCount,
     paidOrderCount: paidTotals._count,

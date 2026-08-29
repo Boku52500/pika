@@ -26,8 +26,6 @@ const PRODUCT_VISUALS: readonly ProductVisual[] = [
   "network",
 ];
 
-const AVAILABILITY: readonly ProductAvailability[] = ["in-stock", "low-stock", "out-of-stock"];
-
 function isProductVisual(value: string): value is ProductVisual {
   return (PRODUCT_VISUALS as readonly string[]).includes(value);
 }
@@ -111,12 +109,11 @@ function mapVariantGroups(product: CatalogProduct): ProductVariantGroup[] {
 }
 
 function mapAvailability(product: CatalogProduct): ProductAvailability {
-  if ((AVAILABILITY as readonly string[]).includes(product.stockStatus)) {
-    return product.stockStatus as ProductAvailability;
+  if (!product.isActive) return "out-of-stock";
+  if (product.variants.length > 0) {
+    return product.variants.some((variant) => variant.inStock) ? "in-stock" : "out-of-stock";
   }
-  if (product.stockQuantity <= 0) return "out-of-stock";
-  if (product.stockQuantity <= 3) return "low-stock";
-  return "in-stock";
+  return product.inStock ? "in-stock" : "out-of-stock";
 }
 
 function mapInstallments(product: CatalogProduct): ProductInstallment[] {

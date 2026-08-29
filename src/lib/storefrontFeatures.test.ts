@@ -67,6 +67,19 @@ describe("mini-cart on add to cart", () => {
     const store = read("lib/cartStore.ts");
     assert.match(store, /CartLineItem \| null/);
   });
+
+  it("does not lock page scroll for the desktop popover", () => {
+    const popover = read("components/cart/MiniCartPopover.tsx");
+    assert.match(popover, /if \(isMobile\) document\.body\.style\.overflow = "hidden"/);
+  });
+});
+
+describe("hero carousel controls", () => {
+  it("isolates CTA navigation from slide wrapper links", () => {
+    const hero = read("components/home/HeroCarousel.tsx");
+    assert.match(hero, /იხილე მეტი/);
+    assert.doesNotMatch(hero, /<Link[\s\S]*className="group relative flex h-\[260px\]/);
+  });
 });
 
 describe("interactive cursor defaults", () => {

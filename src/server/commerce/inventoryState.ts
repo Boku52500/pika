@@ -15,32 +15,31 @@ export type InventoryPlan = {
 };
 
 /**
- * Card orders hold stock until PAID or an unpaid terminal state (failed / cancel).
- * Cash and installment commit immediately at placement (existing behavior).
+ * Physical stock holds are disabled — availability is manual via isActive only.
+ * State transitions are retained for schema compatibility but never mutate stock.
  */
 export function planInventoryTransition(
   current: InventoryHoldState | null,
   event: InventoryEvent,
 ): InventoryPlan {
   if (current == null) {
-    if (event === "place_card") return { state: "held", stock: "allocate" };
-    if (event === "place_immediate") return { state: "committed", stock: "allocate" };
+    if (event === "place_card") return { state: "held", stock: "none" };
+    if (event === "place_immediate") return { state: "committed", stock: "none" };
     return { state: "committed", stock: "none" };
   }
 
   if (event === "paid") {
     if (current === "held") return { state: "committed", stock: "none" };
-    if (current === "released") return { state: "committed", stock: "allocate" };
     return { state: "committed", stock: "none" };
   }
 
   if (event === "unpaid_terminal") {
-    if (current === "held") return { state: "released", stock: "release" };
+    if (current === "held") return { state: "released", stock: "none" };
     return { state: current, stock: "none" };
   }
 
   if (event === "retry_payment") {
-    if (current === "released") return { state: "held", stock: "allocate" };
+    if (current === "released") return { state: "held", stock: "none" };
     return { state: current, stock: "none" };
   }
 

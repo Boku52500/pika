@@ -16,7 +16,7 @@ import {
   adminSelectClass,
   adminTextareaClass,
 } from "@/components/admin/adminUi";
-import { BADGE_KIND_OPTIONS, STOCK_STATE_LABEL } from "@/lib/adminLabels";
+import { BADGE_KIND_OPTIONS } from "@/lib/adminLabels";
 import { deactivateAdminProduct, restoreAdminProduct, saveAdminProduct, createAdminVariantOption, createAdminSpecification, createAdminSpecificationValue } from "@/server/actions/admin";
 import { AdminCreatableCombobox } from "@/components/admin/AdminCreatableCombobox";
 import { AdminProductDeleteButton } from "@/components/admin/AdminProductDeleteButton";
@@ -137,7 +137,7 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
         categoryId: form.categoryId,
         price: form.price,
         previousPrice: form.previousPrice,
-        stockQuantity: Number(form.stockQuantity),
+        stockQuantity: 0,
         stockStatus: form.stockStatus,
         isActive: form.isActive,
         isFeatured: form.isFeatured,
@@ -162,7 +162,7 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
           id: variant.id || undefined,
           sku: variant.sku,
           priceOverride: variant.priceOverride,
-          stockQuantity: Number(variant.stockQuantity),
+          stockQuantity: 0,
           isActive: variant.isActive,
           optionIds: variant.optionIds,
         })),
@@ -295,51 +295,23 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
       </section>
 
       <section className={adminCardClass}>
-        <h2 className="mb-4 text-base font-semibold text-text">ფასი და მარაგი</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <h2 className="mb-4 text-base font-semibold text-text">ფასი</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
           <FormField id="price" label="მიმდინარე ფასი" required error={fieldErrors.price}>
             <input id="price" inputMode="decimal" value={form.price} onChange={(e) => patch("price", e.target.value)} className={adminInputErrorClass(Boolean(fieldErrors.price))} />
           </FormField>
           <FormField id="previousPrice" label="წინა ფასი" optional error={fieldErrors.previousPrice}>
             <input id="previousPrice" inputMode="decimal" value={form.previousPrice} onChange={(e) => patch("previousPrice", e.target.value)} className={adminInputErrorClass(Boolean(fieldErrors.previousPrice))} />
           </FormField>
-          <FormField id="stockQuantity" label="მარაგი" required error={fieldErrors.stockQuantity}>
-            <input
-              id="stockQuantity"
-              type="number"
-              min={0}
-              value={form.stockQuantity}
-              onChange={(e) => patch("stockQuantity", Number(e.target.value))}
-              className={adminInputErrorClass(Boolean(fieldErrors.stockQuantity))}
-            />
-          </FormField>
-          <FormField id="stockStatus" label="ხელმისაწვდომობა">
-            <select
-              id="stockStatus"
-              value={form.stockStatus}
-              onChange={(e) => patch("stockStatus", e.target.value as AdminProductEditorData["stockStatus"])}
-              className={adminSelectClass}
-            >
-              {Object.entries(STOCK_STATE_LABEL).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </FormField>
         </div>
-        <p className="text-label mt-3 text-text-faint">
-          მარაგის სტატუსი: {STOCK_STATE_LABEL[form.stockQuantity <= 0 ? "out-of-stock" : form.stockQuantity <= 3 ? "low-stock" : "in-stock"]}
-          {variants.length ? " · ვარიანტების მარაგი ინახება ცალკე" : ""}
-        </p>
       </section>
 
       <section className={adminCardClass}>
-        <h2 className="mb-4 text-base font-semibold text-text">ვიტრინა</h2>
+        <h2 className="mb-4 text-base font-semibold text-text">ხელმისაწვდომობა და ვიტრინა</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <label className="flex min-h-11 items-center gap-2 text-small">
             <input type="checkbox" checked={form.isActive} onChange={(e) => patch("isActive", e.target.checked)} />
-            აქტიური
+            ხელმისაწვდომია
           </label>
           <label className="flex min-h-11 items-center gap-2 text-small">
             <input type="checkbox" checked={form.isFeatured} onChange={(e) => patch("isFeatured", e.target.checked)} />
@@ -459,12 +431,12 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
           </Button>
         </div>
         {variants.length === 0 ? (
-          <p className="text-small text-text-muted">ვარიანტები არ არის. პროდუქტის მარაგი გამოიყენება პირდაპირ.</p>
+          <p className="text-small text-text-muted">ვარიანტები არ არის — ხელმისაწვდომობა მართავს მხოლოდ პროდუქტის დონეზე.</p>
         ) : (
           <div className="flex flex-col gap-4">
             {variants.map((variant, index) => (
               <div key={variant.key} className="rounded-[var(--radius-sm)] border border-border p-3">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <FormField id={`v-sku-${index}`} label="SKU">
                     <input
                       id={`v-sku-${index}`}
@@ -481,25 +453,13 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
                       className={adminInputErrorClass(false)}
                     />
                   </FormField>
-                  <FormField id={`v-stock-${index}`} label="მარაგი">
-                    <input
-                      id={`v-stock-${index}`}
-                      type="number"
-                      min={0}
-                      value={variant.stockQuantity}
-                      onChange={(e) =>
-                        setVariants((current) => current.map((row, i) => (i === index ? { ...row, stockQuantity: Number(e.target.value) } : row)))
-                      }
-                      className={adminInputErrorClass(false)}
-                    />
-                  </FormField>
                   <label className="flex min-h-11 items-end gap-2 pb-2 text-small">
                     <input
                       type="checkbox"
                       checked={variant.isActive}
                       onChange={(e) => setVariants((current) => current.map((row, i) => (i === index ? { ...row, isActive: e.target.checked } : row)))}
                     />
-                    აქტიური
+                    ხელმისაწვდომია
                   </label>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

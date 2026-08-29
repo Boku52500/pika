@@ -12,7 +12,7 @@ import {
   getUniqueSpecValues,
 } from "./filters";
 
-const availabilityOptions: ProductAvailability[] = ["in-stock", "low-stock", "out-of-stock"];
+const availabilityOptions: ProductAvailability[] = ["in-stock", "out-of-stock"];
 
 function toggleValue<T extends string>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
