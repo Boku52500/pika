@@ -1,7 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/prisma";
-import { mapProduct } from "@/server/catalog/mappers";
-import { productDetailInclude } from "@/server/catalog/include";
+import { mapProduct, mapProductList } from "@/server/catalog/mappers";
+import { productDetailInclude, productListInclude } from "@/server/catalog/include";
 import type { CatalogProduct, ProductListFilters } from "@/server/catalog/types";
 import { DEFAULT_LOCALE, resolveLocale } from "@/server/locale";
 import { isStorefrontVisible, storefrontProductWhere } from "@/server/catalog/visibility";
@@ -107,13 +107,13 @@ export async function getProducts(filters: ProductListFilters = {}): Promise<Cat
 
   const products = await prisma.product.findMany({
     where: productWhere(filters, categoryIds),
-    include: productDetailInclude,
+    include: productListInclude,
     orderBy: productOrderBy(filters),
     take: filters.take,
     skip: filters.skip,
   });
 
-  return products.map((product) => mapProduct(product, locale));
+  return products.map((product) => mapProductList(product, locale));
 }
 
 export async function getProductsByCategory(
@@ -127,35 +127,41 @@ export async function getRelatedProducts(
   productIdOrSlug: string,
   limit = 8,
   locale = DEFAULT_LOCALE,
+  known?: { productId: string; categoryId: string },
 ): Promise<CatalogProduct[]> {
-  const product = await prisma.product.findFirst({
-    where: { OR: [{ id: productIdOrSlug }, { slug: productIdOrSlug }] },
-    select: { id: true, categoryId: true },
-  });
-  if (!product) return [];
+  const resolved =
+    known ??
+    (await prisma.product.findFirst({
+      where: { OR: [{ id: productIdOrSlug }, { slug: productIdOrSlug }] },
+      select: { id: true, categoryId: true },
+    }).then((row) => (row ? { productId: row.id, categoryId: row.categoryId } : null)));
+
+  if (!resolved) return [];
+
+  const { productId, categoryId } = resolved;
 
   const relations = await prisma.productRelation.findMany({
-    where: { productId: product.id },
+    where: { productId },
     orderBy: { sortOrder: "asc" },
     take: limit,
-    include: { relatedProduct: { include: productDetailInclude } },
+    include: { relatedProduct: { include: productListInclude } },
   });
 
   const related = relations
     .map((row) => row.relatedProduct)
     .filter((item) => isStorefrontVisible(item))
-    .map((item) => mapProduct(item, resolveLocale(locale)));
+    .map((item) => mapProductList(item, resolveLocale(locale)));
 
   if (related.length > 0) return related.slice(0, limit);
 
   const fallback = await prisma.product.findMany({
-    where: storefrontProductWhere({ categoryId: product.categoryId, id: { not: product.id } }),
-    include: productDetailInclude,
+    where: storefrontProductWhere({ categoryId, id: { not: productId } }),
+    include: productListInclude,
     take: limit,
     orderBy: { createdAt: "desc" },
   });
 
-  return fallback.map((item) => mapProduct(item, resolveLocale(locale)));
+  return fallback.map((item) => mapProductList(item, resolveLocale(locale)));
 }
 
 export async function getRecommendedProducts(
@@ -163,20 +169,25 @@ export async function getRecommendedProducts(
   excludeIds: string[] = [],
   limit = 8,
   locale = DEFAULT_LOCALE,
+  knownProductId?: string,
 ): Promise<CatalogProduct[]> {
-  const product = await prisma.product.findFirst({
-    where: { OR: [{ id: productIdOrSlug }, { slug: productIdOrSlug }] },
-    select: { id: true },
-  });
-  if (!product) return [];
+  const productId =
+    knownProductId ??
+    (
+      await prisma.product.findFirst({
+        where: { OR: [{ id: productIdOrSlug }, { slug: productIdOrSlug }] },
+        select: { id: true },
+      })
+    )?.id;
+  if (!productId) return [];
 
-  const blocked = [...new Set([product.id, ...excludeIds])];
+  const blocked = [...new Set([productId, ...excludeIds])];
   const recommended = await prisma.product.findMany({
     where: storefrontProductWhere({ id: { notIn: blocked } }),
-    include: productDetailInclude,
+    include: productListInclude,
     orderBy: [{ ratingAverage: { sort: "desc", nulls: "last" } }, { reviewCount: "desc" }],
     take: limit,
   });
 
-  return recommended.map((item) => mapProduct(item, resolveLocale(locale)));
+  return recommended.map((item) => mapProductList(item, resolveLocale(locale)));
 }

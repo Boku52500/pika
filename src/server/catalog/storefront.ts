@@ -14,6 +14,8 @@ import {
 import { toStorefrontCategory, toStorefrontProduct } from "@/server/catalog/toStorefrontProduct";
 import type { CatalogProduct } from "@/server/catalog/types";
 
+const HOMEPAGE_SECTION_LIMIT = 12;
+
 const cachedProductBySlug = cache((slug: string) => withCatalogQuery(() => getProductBySlug(slug)));
 const cachedCategoryBySlug = cache((slug: string) => withCatalogQuery(() => getCategoryBySlug(slug)));
 
@@ -22,12 +24,16 @@ export function getStorefrontProductBySlug(slug: string): Promise<CatalogProduct
 }
 
 export async function getHomepageFeaturedProducts(): Promise<Product[]> {
-  const products = await withCatalogQuery(() => getProducts({ featured: true, active: true }));
+  const products = await withCatalogQuery(() =>
+    getProducts({ featured: true, active: true, take: HOMEPAGE_SECTION_LIMIT }),
+  );
   return products.map(toStorefrontProduct);
 }
 
 export async function getHomepageNewArrivals(): Promise<Product[]> {
-  const products = await withCatalogQuery(() => getProducts({ newArrivals: true, active: true }));
+  const products = await withCatalogQuery(() =>
+    getProducts({ newArrivals: true, active: true, take: HOMEPAGE_SECTION_LIMIT }),
+  );
   return products.map(toStorefrontProduct);
 }
 
@@ -57,6 +63,60 @@ export const loadStorefrontCategoryPage = cache(async function loadStorefrontCat
   };
 });
 
+export const loadStorefrontProductCore = cache(async function loadStorefrontProductCore(slug: string): Promise<{
+  product: Product;
+  categoryName: string;
+  categoryHref: string;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  indexable: boolean;
+  canonicalOverride: string | null;
+  productId: string;
+  categoryId: string;
+} | null> {
+  const catalogProduct = await cachedProductBySlug(slug);
+  if (!catalogProduct) return null;
+
+  return {
+    product: toStorefrontProduct(catalogProduct),
+    categoryName: catalogProduct.category.name,
+    categoryHref: `/category/${catalogProduct.category.slug}`,
+    seoTitle: catalogProduct.seo.title,
+    seoDescription: catalogProduct.seo.description,
+    indexable: catalogProduct.seo.indexable,
+    canonicalOverride: catalogProduct.seo.canonicalOverride,
+    productId: catalogProduct.id,
+    categoryId: catalogProduct.category.id,
+  };
+});
+
+export const loadStorefrontProductRecommendations = cache(async function loadStorefrontProductRecommendations(
+  slug: string,
+): Promise<{ related: Product[]; youMightLike: Product[] } | null> {
+  const catalogProduct = await cachedProductBySlug(slug);
+  if (!catalogProduct) return null;
+
+  const known = { productId: catalogProduct.id, categoryId: catalogProduct.category.id };
+  const relatedCatalog = await withCatalogQuery(() =>
+    getRelatedProducts(catalogProduct.id, 8, undefined, known),
+  );
+  const youMightLikeCatalog = await withCatalogQuery(() =>
+    getRecommendedProducts(
+      catalogProduct.id,
+      relatedCatalog.map((item) => item.id),
+      8,
+      undefined,
+      catalogProduct.id,
+    ),
+  );
+
+  return {
+    related: relatedCatalog.map(toStorefrontProduct),
+    youMightLike: youMightLikeCatalog.map(toStorefrontProduct),
+  };
+});
+
+/** @deprecated Prefer loadStorefrontProductCore + loadStorefrontProductRecommendations */
 export const loadStorefrontProductPage = cache(async function loadStorefrontProductPage(slug: string): Promise<{
   product: Product;
   related: Product[];
@@ -68,26 +128,18 @@ export const loadStorefrontProductPage = cache(async function loadStorefrontProd
   indexable: boolean;
   canonicalOverride: string | null;
 } | null> {
-  const catalogProduct = await cachedProductBySlug(slug);
-  if (!catalogProduct) return null;
-
-  const relatedCatalog = await withCatalogQuery(() => getRelatedProducts(catalogProduct.id));
-  const youMightLikeCatalog = await withCatalogQuery(() =>
-    getRecommendedProducts(
-      catalogProduct.id,
-      relatedCatalog.map((item) => item.id),
-    ),
-  );
-
+  const core = await loadStorefrontProductCore(slug);
+  if (!core) return null;
+  const recs = await loadStorefrontProductRecommendations(slug);
   return {
-    product: toStorefrontProduct(catalogProduct),
-    related: relatedCatalog.map(toStorefrontProduct),
-    youMightLike: youMightLikeCatalog.map(toStorefrontProduct),
-    categoryName: catalogProduct.category.name,
-    categoryHref: `/category/${catalogProduct.category.slug}`,
-    seoTitle: catalogProduct.seo.title,
-    seoDescription: catalogProduct.seo.description,
-    indexable: catalogProduct.seo.indexable,
-    canonicalOverride: catalogProduct.seo.canonicalOverride,
+    product: core.product,
+    related: recs?.related ?? [],
+    youMightLike: recs?.youMightLike ?? [],
+    categoryName: core.categoryName,
+    categoryHref: core.categoryHref,
+    seoTitle: core.seoTitle,
+    seoDescription: core.seoDescription,
+    indexable: core.indexable,
+    canonicalOverride: core.canonicalOverride,
   };
 });

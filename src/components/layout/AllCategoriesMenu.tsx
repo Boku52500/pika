@@ -31,6 +31,7 @@ function Branch({
             <div className="flex items-stretch">
               <Link
                 href={node.href}
+                prefetch={false}
                 role="menuitem"
                 onClick={onNavigate}
                 className={cn(

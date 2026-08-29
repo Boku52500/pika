@@ -66,6 +66,16 @@ type ProductRecord = Product & {
   installmentTerms: ProductInstallmentTerm[];
 };
 
+type ProductListRecord = Product & {
+  translations: ProductTranslation[];
+  brand: BrandWithTranslations;
+  category: CategoryWithTranslations;
+  images: (ProductImage & { translations: ProductImageTranslation[] })[];
+  highlights: (ProductHighlight & { translations: ProductHighlightTranslation[] })[];
+  variants: { stockQuantity: number }[];
+  installmentTerms: ProductInstallmentTerm[];
+};
+
 /**
  * Prisma model → JSON-serializable catalog DTO.
  * All money conversion happens here (`moneyToNumber` / `decimalToNumber`).
@@ -115,7 +125,10 @@ function effectiveStock(product: ProductRecord): number {
   return product.stockQuantity;
 }
 
-function mapImages(product: ProductRecord, locale: AppLocale): CatalogImage[] {
+function mapImages(
+  product: { images: (ProductImage & { translations: ProductImageTranslation[] })[] },
+  locale: AppLocale,
+): CatalogImage[] {
   return [...product.images]
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((image) => ({
@@ -169,6 +182,74 @@ function mapVariants(product: ProductRecord, locale: AppLocale): CatalogProductV
       })),
     };
   });
+}
+
+function effectiveListStock(product: ProductListRecord): number {
+  if (product.variants.length > 0) {
+    return product.variants.reduce((sum, variant) => sum + variant.stockQuantity, 0);
+  }
+  return product.stockQuantity;
+}
+
+export function mapProductList(product: ProductListRecord, locale: AppLocale = DEFAULT_LOCALE): CatalogProduct {
+  const t = pickTranslation(product.translations, locale);
+  const stockQuantity = effectiveListStock(product);
+
+  return {
+    id: product.id,
+    slug: product.slug,
+    sku: product.sku,
+    name: t.name,
+    shortDescription: t.shortDescription,
+    description: t.description,
+    brand: mapBrand(product.brand, locale),
+    category: {
+      id: product.category.id,
+      slug: product.category.slug,
+      name: pickTranslation(product.category.translations, locale).name,
+    },
+    price: moneyToNumber(product.price),
+    previousPrice: product.previousPrice == null ? null : moneyToNumber(product.previousPrice),
+    stockQuantity,
+    inStock: stockQuantity > 0,
+    isActive: product.isActive,
+    isFeatured: product.isFeatured,
+    isNew: product.isNew,
+    images: mapImages(product, locale),
+    highlights: [...product.highlights]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((row) => pickTranslation(row.translations, locale).text),
+    packageItems: [],
+    specs: [],
+    variants: [],
+    installments: [...product.installmentTerms]
+      .sort((a, b) => a.months - b.months)
+      .map((term) => ({
+        months: term.months,
+        monthlyPrice: moneyToNumber(term.monthlyPrice),
+      })),
+    seo: {
+      title: t.seoTitle,
+      description: t.seoDescription,
+      indexable: product.indexable,
+      canonicalOverride: product.canonicalOverride,
+    },
+    featuredSort: product.featuredSort,
+    newArrivalSort: product.newArrivalSort,
+    illustrationKey: product.illustrationKey,
+    illustrationTone: product.illustrationTone,
+    ratingAverage: product.ratingAverage == null ? null : decimalToNumber(product.ratingAverage),
+    reviewCount: product.reviewCount,
+    warrantyMonths: product.warrantyMonths,
+    warranty: t.warranty,
+    returnDays: product.returnDays,
+    deliveryEstimate: t.deliveryEstimate,
+    badgeKind: product.badgeKind,
+    badgeLabel: product.badgeLabel,
+    stockStatus: product.stockStatus,
+    storageLabel: product.storageLabel,
+    ramLabel: product.ramLabel,
+  };
 }
 
 export function mapProduct(product: ProductRecord, locale: AppLocale = DEFAULT_LOCALE): CatalogProduct {

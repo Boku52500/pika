@@ -72,6 +72,7 @@ export function SearchResultsPanel({
     recent,
     removeRecent,
     clearRecent,
+    prefetchItem,
   } = box;
 
   if (belowThreshold) {
@@ -179,7 +180,10 @@ export function SearchResultsPanel({
                     role="option"
                     aria-selected={active}
                     type="button"
-                    onMouseEnter={() => setActiveIndex(index)}
+                    onMouseEnter={() => {
+                      setActiveIndex(index);
+                      prefetchItem(item);
+                    }}
                     onClick={() => selectItem(item)}
                     className={cn("flex w-full items-center gap-3 px-4 py-2.5 text-left", active && "bg-surface-2")}
                   >
@@ -214,7 +218,10 @@ export function SearchResultsPanel({
                 id={optionId(idPrefix, index)}
                 product={item.product}
                 active={active}
-                onHover={() => setActiveIndex(index)}
+                onHover={() => {
+                  setActiveIndex(index);
+                  prefetchItem(item);
+                }}
                 onSelect={() => selectItem(item)}
               />
             ) : item.type === "view-all" ? (
@@ -223,7 +230,10 @@ export function SearchResultsPanel({
                 role="option"
                 aria-selected={active}
                 type="button"
-                onMouseEnter={() => setActiveIndex(index)}
+                onMouseEnter={() => {
+                  setActiveIndex(index);
+                  prefetchItem(item);
+                }}
                 onClick={() => selectItem(item)}
                 className={cn(
                   "mt-1 flex w-full items-center justify-center gap-1.5 border-t border-border px-4 py-3 text-small font-semibold text-brand-600 transition-colors",

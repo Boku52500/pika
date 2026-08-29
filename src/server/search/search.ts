@@ -11,8 +11,8 @@ import {
 import { prisma } from "@/server/prisma";
 import { getBrands } from "@/server/catalog/brands";
 import { getCategories } from "@/server/catalog/categories";
-import { productDetailInclude } from "@/server/catalog/include";
-import { mapProduct } from "@/server/catalog/mappers";
+import { productListInclude } from "@/server/catalog/include";
+import { mapProductList } from "@/server/catalog/mappers";
 import { toStorefrontCategory, toStorefrontProduct } from "@/server/catalog/toStorefrontProduct";
 import type { CatalogProduct } from "@/server/catalog/types";
 import { DEFAULT_LOCALE, resolveLocale } from "@/server/locale";
@@ -118,12 +118,12 @@ export async function searchProducts(
 
   const rows = await prisma.product.findMany({
     where: productCandidateWhere(needles),
-    include: productDetailInclude,
+    include: productListInclude,
     take,
   });
 
   const ranked = rankCatalogProducts(
-    rows.map((row) => mapProduct(row, locale)),
+    rows.map((row) => mapProductList(row, locale)),
     q,
   );
   return ranked.map(toStorefrontProduct);

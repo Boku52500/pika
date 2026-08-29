@@ -13,6 +13,28 @@ export const categoryInclude = {
   },
 } satisfies Prisma.CategoryInclude;
 
+/** Lightweight include for PLP cards, search, related rows — not full PDP. */
+export const productListInclude = {
+  translations: true,
+  brand: { include: brandInclude },
+  category: { include: { translations: true } },
+  images: {
+    orderBy: { sortOrder: "asc" as const },
+    take: 2,
+    include: { translations: true },
+  },
+  highlights: {
+    orderBy: { sortOrder: "asc" as const },
+    take: 4,
+    include: { translations: true },
+  },
+  variants: {
+    where: { isActive: true },
+    select: { stockQuantity: true },
+  },
+  installmentTerms: { orderBy: { months: "desc" as const }, take: 1 },
+} satisfies Prisma.ProductInclude;
+
 export const productDetailInclude = {
   translations: true,
   brand: { include: brandInclude },

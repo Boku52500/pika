@@ -9,7 +9,8 @@ import { getHomepageFeaturedProducts, getHomepageNewArrivals } from "@/server/ca
 import { JsonLd } from "@/components/seo/JsonLd";
 import { getAppOriginString } from "@/lib/appUrl";
 
-export const dynamic = "force-dynamic";
+/** Catalogue sections are safe to revalidate; session/cart stay client-driven. */
+export const revalidate = 60;
 
 export default async function Home() {
   const [featuredProducts, newArrivals] = await Promise.all([

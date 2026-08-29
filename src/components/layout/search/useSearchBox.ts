@@ -147,6 +147,25 @@ export function useSearchBox({ onNavigate }: { onNavigate?: () => void } = {}) {
     [addRecent, onNavigate, router, trimmed],
   );
 
+  const prefetchItem = useCallback(
+    (item: SearchFlatItem) => {
+      switch (item.type) {
+        case "category":
+          router.prefetch(item.category.href);
+          return;
+        case "product":
+          router.prefetch(`/product/${item.product.slug}`);
+          return;
+        case "view-all":
+          router.prefetch(`/search?q=${encodeURIComponent(item.query)}`);
+          return;
+        default:
+          return;
+      }
+    },
+    [router],
+  );
+
   const selectItem = useCallback(
     (item: SearchFlatItem) => {
       switch (item.type) {
@@ -228,6 +247,7 @@ export function useSearchBox({ onNavigate }: { onNavigate?: () => void } = {}) {
     goToSearch,
     handleKeyDown,
     clear,
+    prefetchItem,
   };
 }
 

@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CategoryPageClient } from "@/components/category/CategoryPageClient";
 import { loadStorefrontCategoryPage } from "@/server/catalog";
+import { loadCategorySeoMetadata } from "@/server/catalog/metadata";
 import { noIndexRobots, pageCanonical } from "@/lib/seo";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export async function generateMetadata({
   params,
@@ -12,14 +13,14 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const page = await loadStorefrontCategoryPage(slug);
-  if (!page) notFound();
+  const meta = await loadCategorySeoMetadata(slug);
+  if (!meta) notFound();
 
   return {
-    title: page.seoTitle ?? `${page.category.name} — Pika`,
-    description: page.seoDescription ?? page.category.description,
-    robots: page.indexable ? undefined : noIndexRobots,
-    ...pageCanonical(`/category/${slug}`, page.canonicalOverride),
+    title: meta.seoTitle ?? `${meta.name} — Pika`,
+    description: meta.seoDescription ?? meta.description,
+    robots: meta.indexable ? undefined : noIndexRobots,
+    ...pageCanonical(`/category/${slug}`, meta.canonicalOverride),
   };
 }
 

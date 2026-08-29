@@ -11,11 +11,12 @@ import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel"
 import { ProductKeyFeatures } from "@/components/product/ProductKeyFeatures";
 import { ProductSpecs } from "@/components/product/ProductSpecs";
 import { ProductReviews } from "@/components/product/ProductReviews";
-import { ProductSection } from "@/components/product/ProductSection";
+import { ProductRecommendations } from "@/components/product/ProductRecommendations";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { getAppOriginString } from "@/lib/appUrl";
 import { noIndexRobots, pageCanonical } from "@/lib/seo";
-import { loadStorefrontProductPage } from "@/server/catalog";
+import { loadStorefrontProductCore } from "@/server/catalog/storefront";
+import { loadProductSeoMetadata } from "@/server/catalog/metadata";
 import {
   getDelivery,
   getDescription,
@@ -31,7 +32,7 @@ import {
   getWhatsIncluded,
 } from "@/lib/productDetails";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export async function generateMetadata({
   params,
@@ -39,22 +40,19 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const page = await loadStorefrontProductPage(slug);
-  if (!page) notFound();
-
-  const ogImage = page.product.images?.find((image) => image.src)?.src;
+  const meta = await loadProductSeoMetadata(slug);
+  if (!meta) notFound();
 
   return {
-    title: page.seoTitle ?? `${page.product.name} — Pika`,
-    description:
-      page.seoDescription ?? page.product.shortDescription ?? getDescription(page.product),
-    robots: page.indexable ? undefined : noIndexRobots,
-    ...pageCanonical(`/product/${slug}`, page.canonicalOverride),
-    openGraph: ogImage
+    title: meta.seoTitle ?? `${meta.name} — Pika`,
+    description: meta.seoDescription ?? meta.shortDescription ?? undefined,
+    robots: meta.indexable ? undefined : noIndexRobots,
+    ...pageCanonical(`/product/${slug}`, meta.canonicalOverride),
+    openGraph: meta.ogImage
       ? {
-          title: page.seoTitle ?? page.product.name,
-          description: page.seoDescription ?? page.product.shortDescription ?? undefined,
-          images: [{ url: ogImage }],
+          title: meta.seoTitle ?? meta.name,
+          description: meta.seoDescription ?? meta.shortDescription ?? undefined,
+          images: [{ url: meta.ogImage }],
         }
       : undefined,
   };
@@ -66,10 +64,10 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const page = await loadStorefrontProductPage(slug);
+  const page = await loadStorefrontProductCore(slug);
   if (!page) notFound();
 
-  const { product, related: relatedProducts, youMightLike, categoryName, categoryHref } = page;
+  const { product, categoryName, categoryHref } = page;
   const sku = getSku(product);
   const images = getGalleryImages(product);
   const installmentOptions = getInstallmentOptions(product);
@@ -229,8 +227,7 @@ export default async function ProductPage({
         </section>
       </Container>
 
-      {relatedProducts.length ? <ProductSection title="მსგავსი პროდუქტები" products={relatedProducts} /> : null}
-      {youMightLike.length ? <ProductSection title="შეიძლება დაგაინტერესოთ" products={youMightLike} /> : null}
+      <ProductRecommendations slug={slug} />
     </>
   );
 }

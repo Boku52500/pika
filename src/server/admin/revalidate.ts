@@ -1,9 +1,11 @@
 import "server-only";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { STOREFRONT_NAV_CACHE_TAG } from "@/server/catalog/nav";
 
 /** Invalidate storefront + admin catalogue views after a mutation. */
 export function revalidateCatalogue(opts?: { productSlug?: string; categorySlug?: string; brandSlug?: string }) {
+  updateTag(STOREFRONT_NAV_CACHE_TAG);
   revalidatePath("/", "layout");
   revalidatePath("/search");
   revalidatePath("/product/[slug]", "page");

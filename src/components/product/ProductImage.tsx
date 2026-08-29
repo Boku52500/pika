@@ -86,10 +86,23 @@ export function ProductImage({
         )}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} className={cn("size-full object-contain", hoverSrc && "transition-opacity duration-300 group-hover:opacity-0")} />
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          className={cn("size-full object-contain", hoverSrc && "transition-opacity duration-300 group-hover:opacity-0")}
+        />
         {hoverSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={hoverSrc} alt="" aria-hidden className="absolute inset-0 size-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <img
+            src={hoverSrc}
+            alt=""
+            aria-hidden
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 size-full object-contain opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+          />
         ) : null}
       </div>
     );

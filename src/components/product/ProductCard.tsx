@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Product } from "@/types/product";
 import { cn, getDiscountPercent } from "@/lib/utils";
 import { availabilityLabel } from "@/lib/productLabels";
@@ -17,9 +20,11 @@ export function ProductCard({
   product: Product;
   className?: string;
 }) {
+  const router = useRouter();
   const discount = getDiscountPercent(product.price, product.previousPrice);
   const outOfStock = product.availability === "out-of-stock";
   const href = `/product/${product.slug}`;
+  const prefetch = () => router.prefetch(href);
   const primaryPhoto = product.images?.find((image) => image.src);
   const hoverPhoto = product.images?.find((image) => image.src && image.src !== primaryPhoto?.src);
 
@@ -37,7 +42,7 @@ export function ProductCard({
           the same destination — this avoids two identical tab stops per
           card while mouse users can still click the photo.
         */}
-        <Link href={href} tabIndex={-1} aria-hidden className="block">
+        <Link href={href} prefetch={false} tabIndex={-1} aria-hidden className="block">
           <ProductImage
             visual={product.visual}
             tone={product.tone}
@@ -64,7 +69,12 @@ export function ProductCard({
         ) : null}
       </div>
 
-      <Link href={href} className="flex flex-col gap-1.5 p-4 pb-0 pt-3">
+      <Link
+        href={href}
+        onMouseEnter={prefetch}
+        onFocus={prefetch}
+        className="flex flex-col gap-1.5 p-4 pb-0 pt-3"
+      >
         <span className="text-label text-text-faint">{product.brand}</span>
         <h3 className="text-body line-clamp-2 min-h-[2.75rem] font-semibold leading-snug text-text">
           {product.name}

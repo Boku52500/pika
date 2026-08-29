@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Product } from "@/types/product";
 import { cn, getDiscountPercent } from "@/lib/utils";
 import { availabilityLabel } from "@/lib/productLabels";
@@ -16,9 +19,11 @@ import { DiscountBadge } from "./ProductBadge";
  * the grid card so both views always stay visually consistent.
  */
 export function ProductListItem({ product, className }: { product: Product; className?: string }) {
+  const router = useRouter();
   const discount = getDiscountPercent(product.price, product.previousPrice);
   const outOfStock = product.availability === "out-of-stock";
   const href = `/product/${product.slug}`;
+  const prefetch = () => router.prefetch(href);
 
   return (
     <div
@@ -28,7 +33,7 @@ export function ProductListItem({ product, className }: { product: Product; clas
       )}
     >
       <div className="relative w-full shrink-0 sm:w-44">
-        <Link href={href} tabIndex={-1} aria-hidden className="block">
+        <Link href={href} prefetch={false} tabIndex={-1} aria-hidden className="block">
           <ProductImage
             visual={product.visual}
             tone={product.tone}
@@ -53,7 +58,7 @@ export function ProductListItem({ product, className }: { product: Product; clas
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:py-1">
-        <Link href={href} className="flex flex-col gap-1.5">
+        <Link href={href} onMouseEnter={prefetch} onFocus={prefetch} className="flex flex-col gap-1.5">
           <span className="text-label text-text-faint">{product.brand}</span>
           <h3 className="text-body font-semibold leading-snug text-text">{product.name}</h3>
           <ProductRating rating={product.rating} reviewCount={product.reviewCount} />

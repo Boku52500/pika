@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Noto_Sans_Georgian } from "next/font/google";
 import { AuthSessionProvider } from "@/components/providers/AuthSessionProvider";
+import { NavigationProgress } from "@/components/layout/NavigationProgress";
 import { ScrollToTopOnNavigate } from "@/components/layout/ScrollToTopOnNavigate";
 import { auth } from "@/auth";
 import { getAppOrigin } from "@/lib/appUrl";
@@ -29,6 +30,7 @@ export default async function RootLayout({
     <html lang="ka" data-scroll-behavior="smooth" className={`${bodyFont.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-bg text-text">
         <AuthSessionProvider session={session}>
+          <NavigationProgress />
           <ScrollToTopOnNavigate />
           {children}
         </AuthSessionProvider>
