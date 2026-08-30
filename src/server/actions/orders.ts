@@ -21,6 +21,7 @@ import { scheduleEmail } from "@/server/email/schedule";
 import { notifyOrderConfirmation } from "@/server/email/notify";
 import { placePromotionRedemption, PromoUserError } from "@/server/commerce/promoRedemption";
 import { isPaidLikePaymentStatus } from "@/server/commerce/inventoryState";
+import { resolveOrderVariant } from "@/server/commerce/variantResolution";
 import { isOnlineBogMethod } from "@/server/payments/methods";
 import { getBogMerchantCapabilities } from "@/server/payments/bog/capabilities";
 import type { StartBogPaymentOptions } from "@/server/payments/initiate";
@@ -87,24 +88,6 @@ function generateOrderNumber(): string {
 
 function pickName(translations: { locale: string; name: string }[], fallback: string): string {
   return translations.find((row) => row.locale === DEFAULT_LOCALE)?.name ?? translations[0]?.name ?? fallback;
-}
-
-type SelectedAxis = { attributeSlug: string; optionSlug: string };
-
-function variantMatches(
-  variant: {
-    options: Array<{
-      option: { slug: string; attribute: { slug: string } };
-    }>;
-  },
-  selected: SelectedAxis[],
-): boolean {
-  if (variant.options.length !== selected.length) return false;
-  return selected.every((sel) =>
-    variant.options.some(
-      (entry) => entry.option.attribute.slug === sel.attributeSlug && entry.option.slug === sel.optionSlug,
-    ),
-  );
 }
 
 function setConfirmCookie(orderNumber: string) {
@@ -227,7 +210,6 @@ export async function createOrder(
           translations: true,
           brand: { include: { translations: true } },
           variants: {
-            where: { isActive: true },
             include: {
               options: {
                 include: {
@@ -277,7 +259,10 @@ export async function createOrder(
           [];
 
         if (product.variants.length > 0) {
-          const match = product.variants.find((variant) => variantMatches(variant, selected));
+          const match = resolveOrderVariant(
+            product.variants.filter((variant) => variant.isActive),
+            selected,
+          );
           if (!match) {
             throw new OrderUserError(`${productName} — არჩეული ვარიანტი აღარ არის ხელმისაწვდომი.`);
           }

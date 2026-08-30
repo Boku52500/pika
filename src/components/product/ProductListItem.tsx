@@ -45,7 +45,7 @@ export function ProductListItem({ product, className }: { product: Product; clas
         {outOfStock ? (
           <div className="pointer-events-none absolute inset-2 flex items-center justify-center rounded-[var(--radius-md)] bg-white/75 backdrop-saturate-150">
             <span className="text-label rounded-[var(--radius-xs)] bg-ink-900 px-2.5 py-1 text-white">
-              არ არის მარაგში
+              {availabilityLabel["out-of-stock"]}
             </span>
           </div>
         ) : null}

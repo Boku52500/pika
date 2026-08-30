@@ -1,32 +1,33 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Zap } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { useCart } from "@/hooks/useCart";
+import type { Product } from "@/types/product";
 
 /**
- * Strongest CTA on the PDP (checkout doesn't exist yet). Clicking shows a
- * transient, honest note instead of pretending to redirect anywhere, so the
- * button stays satisfying to use without lying about functionality.
+ * Primary PDP CTA: add the selected product/quantity/variants to the shared
+ * cart store, then go to checkout. Availability is the storefront's manual
+ * `availability` flag — numeric stock is not used.
  */
 export function BuyNowButton({
-  productName,
+  product,
+  quantity = 1,
+  variants,
   disabled = false,
   className,
 }: {
-  productName: string;
+  product: Product;
+  quantity?: number;
+  variants?: Record<string, string>;
   disabled?: boolean;
   className?: string;
 }) {
-  const [showNote, setShowNote] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
+  const router = useRouter();
+  const { addItem } = useCart();
+  const productName = product.name;
 
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
@@ -38,20 +39,14 @@ export function BuyNowButton({
         aria-label={disabled ? `${productName} — არ არის ხელმისაწვდომი` : `${productName} — ახლავე ყიდვა`}
         onClick={() => {
           if (disabled) return;
-          setShowNote(true);
-          if (timeoutRef.current) clearTimeout(timeoutRef.current);
-          timeoutRef.current = setTimeout(() => setShowNote(false), 2600);
+          addItem(product, quantity, variants);
+          router.push("/checkout");
         }}
         className="w-full gap-2"
       >
         <Zap className="size-[18px]" strokeWidth={2} />
         ახლავე ყიდვა
       </Button>
-      {showNote ? (
-        <p role="status" className="text-label text-center font-medium normal-case tracking-normal text-text-faint">
-          გადახდის სისტემა მალე ხელმისაწვდომი იქნება
-        </p>
-      ) : null}
     </div>
   );
 }

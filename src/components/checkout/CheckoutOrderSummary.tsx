@@ -4,17 +4,16 @@ import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { getCartTotal } from "@/lib/cart";
 import type { PaymentMethodId } from "@/lib/checkout";
-import type { ResolvedCartLine } from "@/hooks/useCart";
+import { useCart, type ResolvedCartLine } from "@/hooks/useCart";
 import { usePromoCode } from "@/hooks/usePromoCode";
 import { CartLineCard } from "@/components/cart/CartLineCard";
 import { PromoCodeField } from "@/components/cart/PromoCodeField";
 import { OrderTotals } from "@/components/cart/OrderTotals";
 
 /**
- * Checkout's right-column summary — read-only line items (reuses
- * `CartLineCard`), the same shared promo field, and the same `OrderTotals`
- * breakdown used on `/cart`. All pricing comes from `lib/cart.ts` +
- * `usePromoCode`, never recomputed locally.
+ * Checkout's right-column summary — line items (reuses `CartLineCard` with
+ * quantity locked and remove wired to the shared cart store), the same
+ * shared promo field, and the same `OrderTotals` breakdown used on `/cart`.
  */
 export function CheckoutOrderSummary({
   items,
@@ -37,6 +36,7 @@ export function CheckoutOrderSummary({
   paymentMethod?: PaymentMethodId | null;
   className?: string;
 }) {
+  const { removeItem } = useCart();
   const { result } = usePromoCode(subtotal);
   const discount = result?.valid ? Math.min(result.discount, subtotal) : 0;
   const total = getCartTotal(subtotal, discount, deliveryFee);
@@ -47,7 +47,15 @@ export function CheckoutOrderSummary({
 
       <div className="-mx-1 flex max-h-72 flex-col divide-y divide-border overflow-y-auto px-1">
         {items.map((line) => (
-          <CartLineCard key={line.id} line={line} compact readOnly onQuantityChange={() => {}} onRemove={() => {}} />
+          <CartLineCard
+            key={line.id}
+            line={line}
+            compact
+            readOnly
+            allowRemove
+            onQuantityChange={() => {}}
+            onRemove={() => removeItem(line.id)}
+          />
         ))}
       </div>
 

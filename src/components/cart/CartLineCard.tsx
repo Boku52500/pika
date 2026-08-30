@@ -18,19 +18,23 @@ export function CartLineCard({
   onRemove,
   compact = false,
   readOnly = false,
+  allowRemove = false,
 }: {
   line: ResolvedCartLine;
   onQuantityChange: (quantity: number) => void;
   onRemove: () => void;
   compact?: boolean;
-  /** Checkout-summary mode: no quantity stepper/remove button, quantity shown as plain text. */
+  /** Checkout-summary mode: no quantity stepper, quantity shown as plain text. */
   readOnly?: boolean;
+  /** Show a remove control even when `readOnly` (checkout line edit). */
+  allowRemove?: boolean;
 }) {
   const { snapshot, quantity, lineTotal, variantLabels } = line;
   const href = `/product/${snapshot.slug}`;
-  const outOfStock = snapshot.availability === "out-of-stock";
+  const unavailable = snapshot.availability === "out-of-stock";
   const discount = getDiscountPercent(snapshot.unitPrice, snapshot.previousPrice);
   const removeLabel = `${snapshot.name} — წაშლა კალათიდან`;
+  const showRemove = allowRemove || !readOnly;
 
   if (compact) {
     return (
@@ -44,16 +48,16 @@ export function CartLineCard({
             <Link href={href} className="text-small line-clamp-2 font-semibold leading-snug text-text hover:text-brand-600">
               {snapshot.name}
             </Link>
-            {readOnly ? null : (
+            {showRemove ? (
               <button
                 type="button"
                 aria-label={removeLabel}
                 onClick={onRemove}
-                className="flex size-7 shrink-0 items-center justify-center rounded-full text-text-faint transition-colors hover:bg-danger-50 hover:text-danger-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full text-text-faint transition-colors hover:bg-danger-50 hover:text-danger-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 sm:size-7"
               >
                 <X className="size-4" strokeWidth={2} />
               </button>
-            )}
+            ) : null}
           </div>
 
           {variantLabels.length ? (
@@ -62,7 +66,7 @@ export function CartLineCard({
             </p>
           ) : null}
 
-          {outOfStock ? <p className="text-label font-medium text-danger-500">არ არის მარაგში</p> : null}
+          {unavailable ? <p className="text-label font-medium text-danger-500">არ არის ხელმისაწვდომი</p> : null}
 
           <div className="mt-1.5 flex items-center justify-between gap-2">
             {readOnly ? (
@@ -70,7 +74,7 @@ export function CartLineCard({
                 {quantity} x {formatPrice(snapshot.unitPrice)}
               </span>
             ) : (
-              <QuantitySelector value={quantity} onChange={onQuantityChange} max={10} disabled={outOfStock} className="h-9" />
+              <QuantitySelector value={quantity} onChange={onQuantityChange} max={10} disabled={unavailable} className="h-9" />
             )}
             <span className="text-small tnum font-semibold text-text">{formatPrice(lineTotal)}</span>
           </div>
@@ -109,8 +113,8 @@ export function CartLineCard({
           </p>
         ) : null}
 
-        {outOfStock ? (
-          <p className="text-small font-medium text-danger-500">არ არის მარაგში — ამჟამად მიუწვდომელია</p>
+        {unavailable ? (
+          <p className="text-small font-medium text-danger-500">არ არის ხელმისაწვდომი</p>
         ) : null}
 
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
@@ -120,7 +124,7 @@ export function CartLineCard({
               <span className="text-small tnum text-text-faint line-through">{formatPrice(snapshot.previousPrice)}</span>
             ) : null}
           </div>
-          <QuantitySelector value={quantity} onChange={onQuantityChange} max={10} disabled={outOfStock} />
+          <QuantitySelector value={quantity} onChange={onQuantityChange} max={10} disabled={unavailable} />
         </div>
       </div>
 

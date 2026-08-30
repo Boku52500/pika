@@ -80,7 +80,7 @@ export function AddToCartButton({
       )}
     >
       {disabled ? (
-        "არ არის მარაგში"
+        "არ არის ხელმისაწვდომი"
       ) : justAdded ? (
         <>
           <Check className="size-4" strokeWidth={2.5} />

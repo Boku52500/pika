@@ -4,7 +4,6 @@ import { Hero } from "@/components/home/Hero";
 import { BrandCarousel } from "@/components/home/BrandCarousel";
 import { CategoryShortcuts } from "@/components/home/CategoryShortcuts";
 import { PromoBanner } from "@/components/home/PromoBanner";
-import { TrustSection } from "@/components/home/TrustSection";
 import { ProductSection } from "@/components/product/ProductSection";
 import {
   getHomepageFeaturedProducts,
@@ -65,8 +64,6 @@ export default async function Home() {
           href="/category/new"
           products={newArrivals}
         />
-
-        <TrustSection />
       </main>
 
       <Footer />

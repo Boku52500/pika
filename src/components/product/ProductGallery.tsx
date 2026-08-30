@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
 import type { ProductImageData } from "@/types/product";
 import { cn } from "@/lib/utils";
+import { availabilityLabel } from "@/lib/productLabels";
 import { ProductImage } from "./ProductImage";
 
 /**
@@ -118,7 +119,9 @@ export function ProductGallery({
 
         {outOfStock ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[var(--radius-lg)] bg-white/60 backdrop-saturate-150">
-            <span className="text-label rounded-[var(--radius-xs)] bg-ink-900 px-3 py-1.5 text-white">არ არის მარაგში</span>
+            <span className="text-label rounded-[var(--radius-xs)] bg-ink-900 px-3 py-1.5 text-white">
+              {availabilityLabel["out-of-stock"]}
+            </span>
           </div>
         ) : null}
 

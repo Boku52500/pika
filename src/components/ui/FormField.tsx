@@ -26,15 +26,19 @@ export function FormField({
 }) {
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <label htmlFor={id} className="text-small font-medium text-text">
-        {label}
-        {required ? (
-          <span aria-hidden className="text-danger-500">
-            {" "}
-            *
-          </span>
+      <label htmlFor={id} className="flex flex-col gap-0.5 text-small font-medium text-text">
+        <span>
+          {label}
+          {required ? (
+            <span aria-hidden className="text-danger-500">
+              {" "}
+              *
+            </span>
+          ) : null}
+        </span>
+        {optional ? (
+          <span className="text-label font-normal normal-case tracking-normal text-text-faint">(არასავალდებულო)</span>
         ) : null}
-        {optional ? <span className="font-normal text-text-faint"> (არასავალდებულო)</span> : null}
       </label>
       {children}
       {error ? (

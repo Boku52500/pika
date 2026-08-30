@@ -109,3 +109,46 @@ describe("interactive cursor defaults", () => {
     assert.match(css, /cursor:\s*pointer/);
   });
 });
+
+describe("buy now uses checkout instead of coming-soon copy", () => {
+  it("adds to the cart and navigates to checkout without obsolete help text", () => {
+    const button = read("components/product/BuyNowButton.tsx");
+    assert.match(button, /router\.push\("\/checkout"\)/);
+    assert.match(button, /addItem\(/);
+    assert.doesNotMatch(button, /გადახდის სისტემა მალე ხელმისაწვდომი იქნება/);
+    assert.match(read("components/product/ProductActions.tsx"), /disabled=\{unavailable\}/);
+  });
+});
+
+describe("header and footer logo", () => {
+  it("targets the homepage from header and footer logos", () => {
+    assert.match(read("components/layout/Logo.tsx"), /href="\/"/);
+    assert.match(read("components/layout/Logo.tsx"), /scrollHomeLogoToTop/);
+    assert.match(read("components/layout/Footer.tsx"), /<Logo/);
+    assert.match(read("components/layout/StorefrontHeader.tsx"), /<Logo|<Header/);
+  });
+});
+
+describe("checkout optional labels and line removal", () => {
+  it("stacks the optional indicator under the field title", () => {
+    const field = read("components/ui/FormField.tsx");
+    assert.match(field, /flex flex-col/);
+    assert.match(field, /\(არასავალდებულო\)/);
+    assert.doesNotMatch(field, / \(არასავალდებულო\)/);
+  });
+
+  it("removes checkout lines through the shared cart store", () => {
+    const summary = read("components/checkout/CheckoutOrderSummary.tsx");
+    assert.match(summary, /removeItem\(line\.id\)/);
+    assert.match(summary, /allowRemove/);
+    assert.match(read("components/checkout/CheckoutPageClient.tsx"), /EmptyCartState/);
+  });
+});
+
+describe("homepage trust badges", () => {
+  it("does not render the large generic trust section", () => {
+    assert.equal(existsSync(join(root, "components/home/TrustSection.tsx")), false);
+    assert.doesNotMatch(read("app/page.tsx"), /TrustSection/);
+    assert.doesNotMatch(read("app/page.tsx"), /ოფიციალური პროდუქცია/);
+  });
+});

@@ -23,7 +23,7 @@ export function ProductActions({
   selectedVariants: Record<string, string>;
   onVariantChange: (groupId: string, value: string) => void;
 }) {
-  const outOfStock = product.availability === "out-of-stock";
+  const unavailable = product.availability === "out-of-stock";
 
   return (
     <div className="flex flex-col gap-5">
@@ -31,16 +31,21 @@ export function ProductActions({
 
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-small font-medium text-text">რაოდენობა</span>
-        <QuantitySelector value={quantity} onChange={onQuantityChange} disabled={outOfStock} max={10} />
+        <QuantitySelector value={quantity} onChange={onQuantityChange} disabled={unavailable} max={10} />
       </div>
 
       <div className="flex flex-col gap-2.5">
-        <BuyNowButton productName={product.name} disabled={outOfStock} />
+        <BuyNowButton
+          product={product}
+          quantity={quantity}
+          variants={selectedVariants}
+          disabled={unavailable}
+        />
         <AddToCartButton
           product={product}
           quantity={quantity}
           variants={selectedVariants}
-          disabled={outOfStock}
+          disabled={unavailable}
           size="lg"
           variant="outline"
         />
