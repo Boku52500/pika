@@ -19,6 +19,10 @@ export const metadata: Metadata = {
   title: "Pika — ტექნოლოგიების მაღაზია საქართველოში",
   description:
     "Pika — ორიგინალი ტექნიკა და გაჯეტები ოფიციალური გარანტიით. სმარტფონები, ლეპტოპები, ტელევიზორები და აქსესუარები სწრაფი მიწოდებით მთელი საქართველოს მასშტაბით.",
+  icons: {
+    icon: [{ url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" }],
+    apple: [{ url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" }],
+  },
 };
 
 export default async function RootLayout({

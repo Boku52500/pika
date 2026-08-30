@@ -1,21 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
 import { adminCardClass, adminInputErrorClass, adminSelectClass, adminTextareaClass } from "@/components/admin/adminUi";
-import { saveAdminCategory } from "@/server/actions/admin";
+import { saveAdminCategory, uploadAdminCategoryImage } from "@/server/actions/admin";
 import type { AdminCategoryEditorData, AdminCategoryRow } from "@/server/admin/categories";
 
 export function CategoryEditor({
   category,
   allCategories,
   isNew,
+  storageConfigured = false,
 }: {
   category: AdminCategoryEditorData;
   allCategories: AdminCategoryRow[];
   isNew?: boolean;
+  storageConfigured?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -23,6 +25,7 @@ export function CategoryEditor({
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const descendantIds = new Set<string>();
   if (form.id) {
@@ -53,6 +56,8 @@ export function CategoryEditor({
         indexable: form.indexable,
         showInMainNav: form.showInMainNav,
         navSortOrder: Number(form.navSortOrder),
+        showOnHomepage: form.showOnHomepage,
+        homepageSortOrder: Number(form.homepageSortOrder),
         translations: form.translations,
       });
       if (!result.ok) {
@@ -104,9 +109,43 @@ export function CategoryEditor({
           <FormField id="cat-nav-sort" label="ნავიგაციის რიგი">
             <input id="cat-nav-sort" type="number" min={0} value={form.navSortOrder} onChange={(e) => setForm((c) => ({ ...c, navSortOrder: Number(e.target.value) }))} className={adminInputErrorClass(false)} />
           </FormField>
-          <FormField id="cat-image" label="სურათის URL" optional className="sm:col-span-2">
+          <FormField id="cat-home-sort" label="მთავარი გვერდის რიგი">
+            <input id="cat-home-sort" type="number" min={0} value={form.homepageSortOrder} onChange={(e) => setForm((c) => ({ ...c, homepageSortOrder: Number(e.target.value) }))} className={adminInputErrorClass(false)} />
+          </FormField>
+          <FormField id="cat-image" label="სურათის URL (მთავარი გვერდის ბარათი)" optional className="sm:col-span-2">
             <input id="cat-image" value={form.imageUrl} onChange={(e) => setForm((c) => ({ ...c, imageUrl: e.target.value }))} className={adminInputErrorClass(false)} />
           </FormField>
+          {storageConfigured && form.id ? (
+            <FormField id="cat-image-file" label="სურათის ატვირთვა" optional className="sm:col-span-2">
+              <div className="flex flex-wrap gap-2">
+                <input ref={fileRef} id="cat-image-file" type="file" accept="image/jpeg,image/png,image/webp,image/avif" className={adminInputErrorClass(false)} />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={pending}
+                  onClick={() => {
+                    const file = fileRef.current?.files?.[0];
+                    if (!file) return;
+                    startTransition(async () => {
+                      const formData = new FormData();
+                      formData.set("categoryId", form.id);
+                      formData.set("file", file);
+                      const result = await uploadAdminCategoryImage(formData);
+                      if (!result.ok) {
+                        setMessage(result.message);
+                        return;
+                      }
+                      setForm((c) => ({ ...c, imageUrl: result.data.url }));
+                      setSuccess("სურათი ატვირთულია");
+                      router.refresh();
+                    });
+                  }}
+                >
+                  ატვირთვა
+                </Button>
+              </div>
+            </FormField>
+          ) : null}
           <FormField id="cat-icon" label="იკონის გასაღები" optional>
             <input id="cat-icon" value={form.iconKey} onChange={(e) => setForm((c) => ({ ...c, iconKey: e.target.value }))} className={adminInputErrorClass(false)} />
           </FormField>
@@ -132,6 +171,10 @@ export function CategoryEditor({
           <label className="flex min-h-11 items-center gap-2 text-small">
             <input type="checkbox" checked={form.showInMainNav} onChange={(e) => setForm((c) => ({ ...c, showInMainNav: e.target.checked }))} />
             გამოჩნდეს მთავარ ნავიგაციაში
+          </label>
+          <label className="flex min-h-11 items-center gap-2 text-small">
+            <input type="checkbox" checked={form.showOnHomepage} onChange={(e) => setForm((c) => ({ ...c, showOnHomepage: e.target.checked }))} />
+            გამოჩნდეს მთავარ გვერდზე
           </label>
         </div>
       </section>

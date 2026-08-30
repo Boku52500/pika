@@ -128,6 +128,8 @@ export const adminCategorySaveSchema = z.object({
   indexable: z.boolean(),
   showInMainNav: z.boolean().optional().default(false),
   navSortOrder: z.number().int().min(0).max(9999).optional().default(0),
+  showOnHomepage: z.boolean().optional().default(false),
+  homepageSortOrder: z.number().int().min(0).max(9999).optional().default(0),
   translations: z.object({
     ka: z.object({
       name: z.string().trim().min(1, "შეიყვანეთ ქართული დასახელება").max(200),
@@ -160,6 +162,8 @@ export const adminBrandSaveSchema = z.object({
   logoUrl: z.string().trim().max(2000).optional().default(""),
   indexable: z.boolean().default(true),
   sortOrder: z.number().int().min(0).max(9999).default(0),
+  showOnHomepage: z.boolean().optional().default(false),
+  homepageSortOrder: z.number().int().min(0).max(9999).optional().default(0),
   translations: z.object({
     ka: z.object({
       name: z.string().trim().min(1, "შეიყვანეთ ქართული დასახელება").max(200),
@@ -184,6 +188,19 @@ export const adminBrandSaveSchema = z.object({
       })
       .optional(),
   }),
+});
+
+export const adminHeroSlideSaveSchema = z.object({
+  id: z.string().trim().min(1).optional(),
+  imageUrl: z.string().trim().min(1, "ატვირთეთ ან შეიყვანეთ სურათი").max(2000),
+  objectKey: z.string().trim().max(500).optional().nullable(),
+  href: z.string().trim().max(2000).optional().default(""),
+  sortOrder: z.number().int().min(0).max(9999).default(0),
+  isActive: z.boolean().default(true),
+});
+
+export const adminHeroReorderSchema = z.object({
+  orderedIds: z.array(z.string().trim().min(1)).min(1).max(200),
 });
 
 export const adminPromotionSaveSchema = z
@@ -277,6 +294,7 @@ export const adminSpecificationRenameSchema = z.object({
 export type AdminProductSaveInput = z.infer<typeof adminProductSaveSchema>;
 export type AdminCategorySaveInput = z.infer<typeof adminCategorySaveSchema>;
 export type AdminBrandSaveInput = z.infer<typeof adminBrandSaveSchema>;
+export type AdminHeroSlideSaveInput = z.infer<typeof adminHeroSlideSaveSchema>;
 export type AdminPromotionSaveInput = z.infer<typeof adminPromotionSaveSchema>;
 
 export { slug as adminSlugSchema, optionalSlug, moneyField, optionalMoneyField, optionalText };

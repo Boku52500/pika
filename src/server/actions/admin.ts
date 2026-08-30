@@ -9,6 +9,8 @@ import { GENERIC_SERVER_ERROR, type ActionResult } from "@/server/actions/result
 import {
   adminBrandSaveSchema,
   adminCategorySaveSchema,
+  adminHeroReorderSchema,
+  adminHeroSlideSaveSchema,
   adminIdSchema,
   adminOrderStatusSchema,
   adminProductImageAltSchema,
@@ -32,7 +34,6 @@ import {
   renameSpecificationDefinition,
   renameSpecificationValue,
 } from "@/server/admin/specifications";
-import { revalidateCatalogue, revalidateOrders, revalidatePromotions } from "@/server/admin/revalidate";
 import { scheduleEmail } from "@/server/email/schedule";
 import { notifyOrderStatus } from "@/server/email/notify";
 import { shouldSendOrderStatusEmail } from "@/server/email/events";
@@ -41,6 +42,9 @@ import { applyPromoEvent } from "@/server/commerce/promoRedemption";
 import { PRODUCT_IMAGE_MAX_BYTES } from "@/lib/productImageLimits";
 import {
   STORAGE_NOT_CONFIGURED,
+  createBrandLogoObjectKey,
+  createCategoryImageObjectKey,
+  createHeroImageObjectKey,
   createProductImageObjectKey,
   deleteProductImageObject,
   getR2Config,
@@ -49,6 +53,8 @@ import {
   publicUrlForObjectKey,
   putProductImageObject,
 } from "@/server/storage";
+import { normalizeMerchHref } from "@/lib/merchHref";
+import { revalidateCatalogue, revalidateHero, revalidateOrders, revalidatePromotions } from "@/server/admin/revalidate";
 
 function uniqueMessage(error: unknown): string | null {
   if (isUniqueConstraintError(error, "sku")) return "ეს SKU უკვე გამოიყენება";
@@ -657,6 +663,8 @@ export async function saveAdminCategory(input: unknown): Promise<ActionResult<{ 
         indexable: data.indexable,
         showInMainNav: data.showInMainNav,
         navSortOrder: data.navSortOrder,
+        showOnHomepage: data.showOnHomepage,
+        homepageSortOrder: data.homepageSortOrder,
       };
       const category = data.id
         ? await tx.category.update({ where: { id: data.id }, data: payload })
@@ -733,6 +741,8 @@ export async function saveAdminBrand(input: unknown): Promise<ActionResult<{ id:
         logoUrl: emptyToNull(data.logoUrl),
         indexable: data.indexable,
         sortOrder: data.sortOrder,
+        showOnHomepage: data.showOnHomepage,
+        homepageSortOrder: data.homepageSortOrder,
       };
       const brand = data.id
         ? await tx.brand.update({ where: { id: data.id }, data: payload })
@@ -1097,6 +1107,227 @@ export async function updateAdminProductImageAlt(input: unknown): Promise<Action
   });
   revalidateCatalogue({ productSlug: image.product.slug });
   return { ok: true };
+}
+
+export async function saveAdminHeroSlide(input: unknown): Promise<ActionResult<{ id: string }>> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminHeroSlideSaveSchema.safeParse(input);
+  if (!parsed.success) {
+    const { message, fieldErrors } = firstZodMessage(parsed.error);
+    return { ok: false, message, fieldErrors };
+  }
+  const data = parsed.data;
+  const href = normalizeMerchHref(data.href);
+  if (data.href.trim() && !href) {
+    return { ok: false, message: "გადამისამართების ბმული არასწორია", fieldErrors: { href: "შეიყვანეთ შიდა გზა ან http(s) ბმული" } };
+  }
+
+  try {
+    const slide = data.id
+      ? await prisma.heroSlide.update({
+          where: { id: data.id },
+          data: {
+            imageUrl: data.imageUrl.trim(),
+            ...(data.objectKey !== undefined ? { objectKey: emptyToNull(data.objectKey ?? "") } : {}),
+            href,
+            sortOrder: data.sortOrder,
+            isActive: data.isActive,
+          },
+        })
+      : await prisma.heroSlide.create({
+          data: {
+            imageUrl: data.imageUrl.trim(),
+            objectKey: emptyToNull(data.objectKey ?? ""),
+            href,
+            sortOrder: data.sortOrder,
+            isActive: data.isActive,
+          },
+        });
+    revalidateHero();
+    return { ok: true, data: { id: slide.id } };
+  } catch (error) {
+    logError("admin.save_hero_slide_failed", { error });
+    return { ok: false, message: GENERIC_SERVER_ERROR };
+  }
+}
+
+export async function deleteAdminHeroSlide(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminIdSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "სლაიდი ვერ მოიძებნა" };
+
+  const slide = await prisma.heroSlide.findUnique({
+    where: { id: parsed.data.id },
+    select: { id: true, objectKey: true },
+  });
+  if (!slide) return { ok: false, message: "სლაიდი ვერ მოიძებნა" };
+
+  await prisma.heroSlide.delete({ where: { id: slide.id } });
+  if (slide.objectKey) {
+    try {
+      await deleteProductImageObject(slide.objectKey);
+    } catch (error) {
+      logError("admin.hero_image_delete_failed", { error });
+    }
+  }
+  revalidateHero();
+  return { ok: true };
+}
+
+export async function reorderAdminHeroSlides(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminHeroReorderSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "რიგი არასწორია" };
+
+  await prisma.$transaction(
+    parsed.data.orderedIds.map((id, index) =>
+      prisma.heroSlide.update({ where: { id }, data: { sortOrder: index } }),
+    ),
+  );
+  revalidateHero();
+  return { ok: true };
+}
+
+export async function uploadAdminHeroImage(formData: FormData): Promise<ActionResult<{ url: string; objectKey: string }>> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+
+  const config = getR2Config();
+  if (!config) return { ok: false, message: STORAGE_NOT_CONFIGURED };
+
+  const file = formData.get("file");
+  if (!isUploadFile(file)) return { ok: false, message: "ატვირთეთ სურათის ფაილი" };
+  if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
+    return { ok: false, message: "სურათი ძალიან დიდია (მაქსიმუმ 10 MB)" };
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  let processed: Buffer;
+  try {
+    processed = await processProductImage(bytes);
+  } catch (error) {
+    if (error instanceof ProductImageValidationError) return { ok: false, message: error.message };
+    logError("admin.process_hero_image_failed", { error });
+    return { ok: false, message: "სურათის დამუშავება ვერ მოხერხდა" };
+  }
+
+  const objectKey = createHeroImageObjectKey();
+  try {
+    await putProductImageObject(objectKey, processed);
+  } catch (error) {
+    logError("admin.r2_hero_put_failed", { error });
+    return { ok: false, message: "სურათის შენახვა საცავში ვერ მოხერხდა" };
+  }
+
+  return {
+    ok: true,
+    data: { url: publicUrlForObjectKey(config.publicBaseUrl, objectKey), objectKey },
+  };
+}
+
+export async function uploadAdminBrandLogo(formData: FormData): Promise<ActionResult<{ url: string; objectKey: string }>> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+
+  const config = getR2Config();
+  if (!config) return { ok: false, message: STORAGE_NOT_CONFIGURED };
+
+  const brandId = String(formData.get("brandId") ?? "").trim();
+  const file = formData.get("file");
+  if (!brandId || !isUploadFile(file)) return { ok: false, message: "ატვირთეთ სურათის ფაილი" };
+  if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
+    return { ok: false, message: "სურათი ძალიან დიდია (მაქსიმუმ 10 MB)" };
+  }
+
+  const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { id: true, logoObjectKey: true, slug: true } });
+  if (!brand) return { ok: false, message: "ბრენდი ვერ მოიძებნა" };
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  let processed: Buffer;
+  try {
+    processed = await processProductImage(bytes);
+  } catch (error) {
+    if (error instanceof ProductImageValidationError) return { ok: false, message: error.message };
+    return { ok: false, message: "სურათის დამუშავება ვერ მოხერხდა" };
+  }
+
+  let objectKey: string;
+  try {
+    objectKey = createBrandLogoObjectKey(brand.id);
+  } catch {
+    return { ok: false, message: "ბრენდის იდენტიფიკატორი არასწორია" };
+  }
+
+  try {
+    await putProductImageObject(objectKey, processed);
+  } catch (error) {
+    logError("admin.r2_brand_put_failed", { error });
+    return { ok: false, message: "სურათის შენახვა საცავში ვერ მოხერხდა" };
+  }
+
+  const url = publicUrlForObjectKey(config.publicBaseUrl, objectKey);
+  await prisma.brand.update({
+    where: { id: brand.id },
+    data: { logoUrl: url, logoObjectKey: objectKey },
+  });
+  if (brand.logoObjectKey && brand.logoObjectKey !== objectKey) {
+    try {
+      await deleteProductImageObject(brand.logoObjectKey);
+    } catch (error) {
+      logError("admin.brand_logo_cleanup_failed", { error });
+    }
+  }
+  revalidateCatalogue({ brandSlug: brand.slug });
+  return { ok: true, data: { url, objectKey } };
+}
+
+export async function uploadAdminCategoryImage(formData: FormData): Promise<ActionResult<{ url: string; objectKey: string }>> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+
+  const config = getR2Config();
+  if (!config) return { ok: false, message: STORAGE_NOT_CONFIGURED };
+
+  const categoryId = String(formData.get("categoryId") ?? "").trim();
+  const file = formData.get("file");
+  if (!categoryId || !isUploadFile(file)) return { ok: false, message: "ატვირთეთ სურათის ფაილი" };
+  if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
+    return { ok: false, message: "სურათი ძალიან დიდია (მაქსიმუმ 10 MB)" };
+  }
+
+  const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true, slug: true } });
+  if (!category) return { ok: false, message: "კატეგორია ვერ მოიძებნა" };
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  let processed: Buffer;
+  try {
+    processed = await processProductImage(bytes);
+  } catch (error) {
+    if (error instanceof ProductImageValidationError) return { ok: false, message: error.message };
+    return { ok: false, message: "სურათის დამუშავება ვერ მოხერხდა" };
+  }
+
+  let objectKey: string;
+  try {
+    objectKey = createCategoryImageObjectKey(category.id);
+  } catch {
+    return { ok: false, message: "კატეგორიის იდენტიფიკატორი არასწორია" };
+  }
+
+  try {
+    await putProductImageObject(objectKey, processed);
+  } catch (error) {
+    logError("admin.r2_category_put_failed", { error });
+    return { ok: false, message: "სურათის შენახვა საცავში ვერ მოხერხდა" };
+  }
+
+  const url = publicUrlForObjectKey(config.publicBaseUrl, objectKey);
+  await prisma.category.update({ where: { id: category.id }, data: { imageUrl: url } });
+  revalidateCatalogue({ categorySlug: category.slug });
+  return { ok: true, data: { url, objectKey } };
 }
 
 export async function adminSignOut() {

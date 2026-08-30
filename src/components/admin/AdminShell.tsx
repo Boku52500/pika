@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   Percent,
   ListChecks,
+  ImageIcon,
   Menu,
   X,
   LogOut,
@@ -23,6 +24,7 @@ import type { AdminUser } from "@/server/auth/admin";
 
 const NAV: { href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean }[] = [
   { href: "/admin", label: "მიმოხილვა", icon: LayoutDashboard, exact: true },
+  { href: "/admin/hero", label: "ჰერო ბანერები", icon: ImageIcon },
   { href: "/admin/products", label: "პროდუქტები", icon: Package },
   { href: "/admin/categories", label: "კატეგორიები", icon: FolderTree },
   { href: "/admin/specifications", label: "სპეციფიკაციები", icon: ListChecks },
@@ -73,7 +75,9 @@ export function AdminShell({ admin, children }: { admin: AdminUser; children: Re
       <div className="lg:grid lg:grid-cols-[240px_1fr]">
         <aside className="hidden min-h-screen flex-col bg-ink-900 px-3 py-5 lg:flex">
           <div className="px-2 pb-6">
-            <Logo dark />
+            <span className="inline-flex rounded-[var(--radius-sm)] bg-white px-2 py-1.5">
+              <Logo />
+            </span>
             <p className="text-label mt-2 text-white/50">ადმინისტრაცია</p>
           </div>
           <NavLinks pathname={pathname} />

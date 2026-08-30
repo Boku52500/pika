@@ -12,7 +12,6 @@ import { MobileSearchOverlay } from "./MobileSearchOverlay";
 import { CategoryNav } from "./CategoryNav";
 import { MobileCategoryChips } from "./MobileCategoryChips";
 import { MobileMenu } from "./MobileMenu";
-import { TopUtilityBar } from "./TopUtilityBar";
 import { HeaderAccountMenu } from "./HeaderAccountMenu";
 import { HeaderCartArea } from "@/components/cart/HeaderCartArea";
 import { CartDrawer } from "@/components/cart/CartDrawer";
@@ -62,8 +61,6 @@ export function Header({
 
   return (
     <header className="sticky top-0 z-50 w-full">
-      <TopUtilityBar />
-
       <div className={cn("overflow-visible border-b border-border bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80", HEADER_SEARCH_STACK_CLASS)}>
         <Container>
           <div className="flex h-16 items-center gap-3 lg:h-[4.25rem] lg:gap-6">

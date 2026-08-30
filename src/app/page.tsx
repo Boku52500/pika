@@ -1,11 +1,17 @@
 import { StorefrontHeader } from "@/components/layout/StorefrontHeader";
 import { Footer } from "@/components/layout/Footer";
 import { Hero } from "@/components/home/Hero";
+import { BrandCarousel } from "@/components/home/BrandCarousel";
 import { CategoryShortcuts } from "@/components/home/CategoryShortcuts";
 import { PromoBanner } from "@/components/home/PromoBanner";
 import { TrustSection } from "@/components/home/TrustSection";
 import { ProductSection } from "@/components/product/ProductSection";
-import { getHomepageFeaturedProducts, getHomepageNewArrivals } from "@/server/catalog";
+import {
+  getHomepageFeaturedProducts,
+  getHomepageNewArrivals,
+} from "@/server/catalog";
+import { getStorefrontHeroSlides } from "@/server/catalog/hero";
+import { getHomepageBrandSlides, getHomepageCategoryCards } from "@/server/catalog/homepage";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { getAppOriginString } from "@/lib/appUrl";
 
@@ -13,9 +19,12 @@ import { getAppOriginString } from "@/lib/appUrl";
 export const revalidate = 60;
 
 export default async function Home() {
-  const [featuredProducts, newArrivals] = await Promise.all([
+  const [featuredProducts, newArrivals, heroSlides, brandSlides, categoryCards] = await Promise.all([
     getHomepageFeaturedProducts(),
     getHomepageNewArrivals(),
+    getStorefrontHeroSlides(),
+    getHomepageBrandSlides(),
+    getHomepageCategoryCards(),
   ]);
   const origin = getAppOriginString();
 
@@ -29,14 +38,15 @@ export default async function Home() {
           url: origin,
           email: "info@pika.ge",
           telephone: "+995322000000",
+          logo: `${origin}/Logo.png`,
         }}
       />
       <StorefrontHeader />
 
       <main className="flex-1">
-        <Hero />
-
-        <CategoryShortcuts />
+        <Hero slides={heroSlides} />
+        <BrandCarousel brands={brandSlides} />
+        <CategoryShortcuts categories={categoryCards} />
 
         <ProductSection
           eyebrow="შერჩეული ჩვენს მიერ"

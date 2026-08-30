@@ -2,18 +2,37 @@ import "server-only";
 
 import { revalidatePath, updateTag } from "next/cache";
 import { STOREFRONT_NAV_CACHE_TAG } from "@/server/catalog/nav";
+import {
+  STOREFRONT_BRANDS_CACHE_TAG,
+  STOREFRONT_HERO_CACHE_TAG,
+  STOREFRONT_HOMEPAGE_CATEGORIES_CACHE_TAG,
+} from "@/server/catalog/merchTags";
 
 /** Invalidate storefront + admin catalogue views after a mutation. */
 export function revalidateCatalogue(opts?: { productSlug?: string; categorySlug?: string; brandSlug?: string }) {
   updateTag(STOREFRONT_NAV_CACHE_TAG);
+  updateTag(STOREFRONT_HERO_CACHE_TAG);
+  updateTag(STOREFRONT_BRANDS_CACHE_TAG);
+  updateTag(STOREFRONT_HOMEPAGE_CATEGORIES_CACHE_TAG);
   revalidatePath("/", "layout");
+  revalidatePath("/");
   revalidatePath("/search");
   revalidatePath("/product/[slug]", "page");
   revalidatePath("/category/[slug]", "page");
+  revalidatePath("/brand/[slug]", "page");
   revalidatePath("/admin", "layout");
   if (opts?.productSlug) revalidatePath(`/product/${opts.productSlug}`);
   if (opts?.categorySlug) revalidatePath(`/category/${opts.categorySlug}`);
-  if (opts?.brandSlug) revalidatePath(`/category/${opts.brandSlug}`);
+  if (opts?.brandSlug) {
+    revalidatePath(`/brand/${opts.brandSlug}`);
+    revalidatePath(`/category/${opts.brandSlug}`);
+  }
+}
+
+export function revalidateHero() {
+  updateTag(STOREFRONT_HERO_CACHE_TAG);
+  revalidatePath("/");
+  revalidatePath("/admin/hero");
 }
 
 export function revalidateOrders() {

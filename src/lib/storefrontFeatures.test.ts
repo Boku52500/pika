@@ -72,13 +72,34 @@ describe("mini-cart on add to cart", () => {
     const popover = read("components/cart/MiniCartPopover.tsx");
     assert.match(popover, /if \(isMobile\) document\.body\.style\.overflow = "hidden"/);
   });
+
+  it("opens CartDrawer from the header cart icon, not MiniCartPopover", () => {
+    const button = read("components/cart/HeaderCartButton.tsx");
+    assert.match(button, /openDrawer\(\)/);
+    assert.match(button, /if \(open\) close\(\)/);
+    assert.doesNotMatch(button, /openWithItem|toggle\(\)/);
+  });
 });
 
 describe("hero carousel controls", () => {
-  it("isolates CTA navigation from slide wrapper links", () => {
+  it("renders image-only slides without storefront CTA text", () => {
     const hero = read("components/home/HeroCarousel.tsx");
-    assert.match(hero, /იხილე მეტი/);
-    assert.doesNotMatch(hero, /<Link[\s\S]*className="group relative flex h-\[260px\]/);
+    assert.doesNotMatch(hero, /იხილე მეტი/);
+    assert.match(hero, /object-cover/);
+    assert.match(hero, /StorefrontHeroSlide/);
+  });
+});
+
+describe("storefront branding pass", () => {
+  it("uses Logo.png and removes the top utility bar", () => {
+    assert.match(read("components/layout/Logo.tsx"), /\/Logo\.png/);
+    assert.equal(existsSync(join(root, "components/layout/TopUtilityBar.tsx")), false);
+    assert.doesNotMatch(read("components/layout/Header.tsx"), /TopUtilityBar/);
+  });
+
+  it("configures favicon metadata and #27386d brand token", () => {
+    assert.match(read("app/layout.tsx"), /favicon-96x96\.png/);
+    assert.match(read("app/globals.css"), /--color-brand-600:\s*#27386d/);
   });
 });
 

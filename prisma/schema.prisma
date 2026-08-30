@@ -156,9 +156,15 @@ model Brand {
   id                 String   @id @default(cuid())
   slug               String   @unique
   logoUrl            String?
+  /// R2 object key when logo is storage-managed. Null for external/legacy URLs.
+  logoObjectKey      String?  @unique
   indexable          Boolean  @default(true)
   canonicalOverride  String?
   sortOrder          Int      @default(0)
+  /// When true, this brand appears in the homepage brands slideshow.
+  showOnHomepage     Boolean  @default(false)
+  /// Sort key for the homepage brands slideshow only.
+  homepageSortOrder  Int      @default(0)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -166,6 +172,7 @@ model Brand {
   products     Product[]
 
   @@index([indexable])
+  @@index([showOnHomepage, homepageSortOrder])
 }
 
 model BrandTranslation {
@@ -196,6 +203,10 @@ model Category {
   showInMainNav      Boolean  @default(false)
   /// Sort key for the main navbar only. Independent of catalogue `sortOrder`.
   navSortOrder       Int      @default(0)
+  /// When true, this category appears in the homepage category cards section.
+  showOnHomepage     Boolean  @default(false)
+  /// Sort key for homepage category cards only.
+  homepageSortOrder  Int      @default(0)
   indexable          Boolean  @default(true)
   canonicalOverride  String?
   createdAt          DateTime @default(now())
@@ -212,6 +223,7 @@ model Category {
   @@index([isActive, sortOrder])
   @@index([slug, isActive])
   @@index([showInMainNav, navSortOrder])
+  @@index([showOnHomepage, homepageSortOrder])
 }
 
 model CategoryTranslation {
@@ -228,6 +240,22 @@ model CategoryTranslation {
   @@unique([categoryId, locale])
   @@index([locale])
   @@index([name])
+}
+
+/// Homepage hero banner slides — image-only, admin-managed.
+model HeroSlide {
+  id        String   @id @default(cuid())
+  imageUrl  String
+  /// R2 object key when this slide is storage-managed.
+  objectKey String?  @unique
+  /// Optional redirect. Empty/null = non-navigational banner.
+  href      String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
 }
 
 model Product {

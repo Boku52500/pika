@@ -28,6 +28,8 @@ export type AdminCategoryEditorData = {
   indexable: boolean;
   showInMainNav: boolean;
   navSortOrder: number;
+  showOnHomepage: boolean;
+  homepageSortOrder: number;
   translations: {
     ka: { name: string; description: string; seoTitle: string; seoDescription: string };
     en: { name: string; description: string; seoTitle: string; seoDescription: string };
@@ -130,6 +132,8 @@ export async function getAdminCategoryEditor(id: string): Promise<AdminCategoryE
     indexable: category.indexable,
     showInMainNav: category.showInMainNav,
     navSortOrder: category.navSortOrder,
+    showOnHomepage: category.showOnHomepage,
+    homepageSortOrder: category.homepageSortOrder,
     translations: {
       ka: copyFrom(category.translations, "ka"),
       en: copyFrom(category.translations, "en"),
@@ -150,6 +154,8 @@ export function emptyCategoryEditor(): AdminCategoryEditorData {
     indexable: true,
     showInMainNav: false,
     navSortOrder: 0,
+    showOnHomepage: false,
+    homepageSortOrder: 0,
     translations: { ka: emptyCopy(), en: emptyCopy(), ru: emptyCopy() },
   };
 }

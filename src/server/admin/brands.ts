@@ -17,6 +17,8 @@ export type AdminBrandEditorData = {
   logoUrl: string;
   indexable: boolean;
   sortOrder: number;
+  showOnHomepage: boolean;
+  homepageSortOrder: number;
   translations: {
     ka: { name: string; description: string; seoTitle: string; seoDescription: string };
     en: { name: string; description: string; seoTitle: string; seoDescription: string };
@@ -68,6 +70,8 @@ export async function getAdminBrandEditor(id: string): Promise<AdminBrandEditorD
     logoUrl: brand.logoUrl ?? "",
     indexable: brand.indexable,
     sortOrder: brand.sortOrder,
+    showOnHomepage: brand.showOnHomepage,
+    homepageSortOrder: brand.homepageSortOrder,
     translations: {
       ka: copyFrom(brand.translations, "ka"),
       en: copyFrom(brand.translations, "en"),
@@ -83,6 +87,8 @@ export function emptyBrandEditor(): AdminBrandEditorData {
     logoUrl: "",
     indexable: true,
     sortOrder: 0,
+    showOnHomepage: false,
+    homepageSortOrder: 0,
     translations: { ka: emptyCopy(), en: emptyCopy(), ru: emptyCopy() },
   };
 }

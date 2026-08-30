@@ -3,6 +3,7 @@
 import { Check, ShoppingBag } from "lucide-react";
 import type { CartLineItem } from "@/lib/productSnapshots";
 import { useCart } from "@/hooks/useCart";
+import { useCartDrawer } from "@/hooks/useCartDrawer";
 import { ProductImage } from "@/components/product/ProductImage";
 import { Button } from "@/components/ui/Button";
 import { getLineTotal } from "@/lib/cart";
@@ -16,6 +17,7 @@ export function MiniCartContent({
   onClose: () => void;
 }) {
   const { items, count, subtotal } = useCart();
+  const { openDrawer } = useCartDrawer();
   const { snapshot, quantity, variantLabels } = displayItem;
   const lineTotal = getLineTotal(snapshot.unitPrice, quantity);
 
@@ -55,7 +57,15 @@ export function MiniCartContent({
           <span className="text-price text-lg text-text">{formatPrice(subtotal)}</span>
         </div>
         <div className="flex flex-col gap-2.5">
-          <Button href="/cart" onClick={onClose} size="lg" className="w-full">
+          <Button
+            type="button"
+            size="lg"
+            className="w-full"
+            onClick={() => {
+              onClose();
+              openDrawer();
+            }}
+          >
             <ShoppingBag className="size-[18px]" strokeWidth={2} />
             კალათის ნახვა
           </Button>
