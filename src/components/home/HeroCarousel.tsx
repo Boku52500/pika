@@ -73,14 +73,14 @@ export function HeroCarousel({ slides }: { slides: StorefrontHeroSlide[] }) {
       >
         {slides.map((slide, index) => {
           const content = (
-            <div className="relative aspect-[21/9] w-full overflow-hidden rounded-[var(--radius-xl)] border border-border bg-surface-2 shadow-sm sm:aspect-[24/9] lg:aspect-[28/9]">
+            <div className="relative aspect-[28/9] w-full overflow-hidden rounded-[var(--radius-xl)] border border-border bg-surface-2 shadow-sm">
               <Image
                 src={slide.imageUrl}
                 alt=""
                 fill
                 priority={index === 0}
                 sizes="(max-width: 768px) 100vw, (max-width: 1280px) 90vw, 1200px"
-                className="object-cover object-center"
+                className="object-contain object-center"
               />
             </div>
           );

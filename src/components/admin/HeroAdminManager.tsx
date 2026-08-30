@@ -132,15 +132,18 @@ export function HeroAdminManager({
         <section className={adminCardClass}>
           <h2 className="mb-4 text-base font-semibold text-text">{editing.id ? "სლაიდის რედაქტირება" : "ახალი სლაიდი"}</h2>
           <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-            <div className="relative aspect-[21/9] overflow-hidden rounded-[var(--radius-md)] border border-border bg-surface-2 lg:aspect-video">
+            <div className="relative aspect-[28/9] overflow-hidden rounded-[var(--radius-md)] border border-border bg-surface-2">
               {editing.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={editing.imageUrl} alt="" className="size-full object-cover" />
+                <img src={editing.imageUrl} alt="" className="size-full object-contain" />
               ) : (
                 <div className="flex size-full items-center justify-center text-small text-text-faint">სურათი არ არის</div>
               )}
             </div>
             <div className="grid gap-3">
+              <p className="text-label text-text-muted">
+                რეკომენდებული ზომა: 2400×772 (28:9). სრული სურათი გამოჩნდება მოჭრის გარეშე.
+              </p>
               {storageConfigured ? (
                 <FormField id="hero-file" label="სურათის ატვირთვა">
                   <div className="flex flex-wrap gap-2">
@@ -204,10 +207,10 @@ export function HeroAdminManager({
       <div className="flex flex-col gap-3">
         {slides.map((slide, index) => (
           <article key={slide.id} className={`${adminCardClass} flex flex-col gap-3 sm:flex-row sm:items-center`}>
-            <div className="relative h-20 w-full overflow-hidden rounded-[var(--radius-sm)] border border-border bg-surface-2 sm:w-40">
+            <div className="relative aspect-[28/9] w-full overflow-hidden rounded-[var(--radius-sm)] border border-border bg-surface-2 sm:w-48">
               {slide.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={slide.imageUrl} alt="" className="size-full object-cover" />
+                <img src={slide.imageUrl} alt="" className="size-full object-contain" />
               ) : null}
             </div>
             <div className="min-w-0 flex-1">

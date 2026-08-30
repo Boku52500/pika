@@ -85,7 +85,9 @@ describe("hero carousel controls", () => {
   it("renders image-only slides without storefront CTA text", () => {
     const hero = read("components/home/HeroCarousel.tsx");
     assert.doesNotMatch(hero, /იხილე მეტი/);
-    assert.match(hero, /object-cover/);
+    assert.match(hero, /object-contain/);
+    assert.match(hero, /aspect-\[28\/9\]/);
+    assert.doesNotMatch(hero, /object-cover/);
     assert.match(hero, /StorefrontHeroSlide/);
   });
 });
