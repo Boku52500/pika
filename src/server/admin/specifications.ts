@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Prisma } from "@/generated/prisma/client";
+import type { Locale, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/db";
 import { pickTranslation } from "@/server/locale";
 import { normalizeReusableLabel, reusableIdentityKey, reusableSlugOrFallback } from "@/lib/reusableLabel";
@@ -113,23 +113,87 @@ export async function listAdminSpecDefinitions(): Promise<AdminSpecDefinitionOpt
   }));
 }
 
+export type SpecWriteCache = {
+  defsLoaded: boolean;
+  valuesLoaded: Set<string>;
+  byKey: Map<string, { id: string; name: string }>;
+};
+
+export function createSpecWriteCache(): SpecWriteCache {
+  return { defsLoaded: false, valuesLoaded: new Set(), byKey: new Map() };
+}
+
+function rememberDefinition(
+  cache: SpecWriteCache | undefined,
+  row: { id: string; slug: string; translations: { locale: Locale; name: string }[] },
+  fallbackName: string,
+) {
+  const resolved = { id: row.id, name: pickTranslation(row.translations).name || fallbackName };
+  if (!cache) return resolved;
+  cache.byKey.set(`id:${row.id}`, resolved);
+  cache.byKey.set(`slug:${row.slug}`, resolved);
+  for (const translation of row.translations) {
+    cache.byKey.set(`key:${reusableIdentityKey(translation.name)}`, resolved);
+  }
+  return resolved;
+}
+
+async function ensureDefinitionsCached(tx: Prisma.TransactionClient, cache?: SpecWriteCache) {
+  if (!cache || cache.defsLoaded) return;
+  const existing = await tx.specificationDefinition.findMany({ include: { translations: true } });
+  for (const row of existing) {
+    rememberDefinition(cache, row, row.slug);
+  }
+  cache.defsLoaded = true;
+}
+
+async function ensureValuesCached(
+  tx: Prisma.TransactionClient,
+  specificationId: string,
+  cache?: SpecWriteCache,
+) {
+  if (!cache || cache.valuesLoaded.has(specificationId)) return;
+  const existing = await tx.specificationValue.findMany({
+    where: { specificationId },
+    include: { translations: true },
+  });
+  for (const row of existing) {
+    const resolved = { id: row.id, name: pickTranslation(row.translations).name || row.slug };
+    cache.byKey.set(`val:${specificationId}:${reusableIdentityKey(resolved.name)}`, resolved);
+    cache.byKey.set(`valslug:${specificationId}:${row.slug}`, resolved);
+  }
+  cache.valuesLoaded.add(specificationId);
+}
+
 export async function findOrCreateSpecificationDefinition(
   tx: Prisma.TransactionClient,
   rawName: string,
+  cache?: SpecWriteCache,
 ): Promise<{ id: string; name: string }> {
   const name = normalizeReusableLabel(rawName);
   if (!name) throw new Error("INVALID_SPEC_NAME");
   const key = reusableIdentityKey(name);
   const slug = reusableSlugOrFallback(name, "spec");
 
-  const existing = await tx.specificationDefinition.findMany({
-    include: { translations: true },
-  });
-  const match = existing.find(
-    (row) => row.slug === slug || matchesLabel(row.translations, key),
-  );
-  if (match) {
-    return { id: match.id, name: pickTranslation(match.translations).name || name };
+  await ensureDefinitionsCached(tx, cache);
+  const cached = cache?.byKey.get(`key:${key}`) ?? cache?.byKey.get(`slug:${slug}`);
+  if (cached) return cached;
+
+  if (!cache) {
+    const existing = await tx.specificationDefinition.findMany({ include: { translations: true } });
+    const match = existing.find((row) => row.slug === slug || matchesLabel(row.translations, key));
+    if (match) return { id: match.id, name: pickTranslation(match.translations).name || name };
+    const group = await ensureGeneralGroup(tx);
+    const created = await tx.specificationDefinition.create({
+      data: {
+        groupId: group.id,
+        slug,
+        sortOrder: existing.length,
+        translations: { create: { locale: "ka", name } },
+      },
+      include: { translations: true },
+    });
+    return { id: created.id, name };
   }
 
   const group = await ensureGeneralGroup(tx);
@@ -137,45 +201,63 @@ export async function findOrCreateSpecificationDefinition(
     data: {
       groupId: group.id,
       slug,
-      sortOrder: existing.length,
+      sortOrder: [...cache.byKey.keys()].filter((entry) => entry.startsWith("id:")).length,
       translations: { create: { locale: "ka", name } },
     },
     include: { translations: true },
   });
-  return { id: created.id, name };
+  return rememberDefinition(cache, created, name);
 }
 
 export async function findOrCreateSpecificationValue(
   tx: Prisma.TransactionClient,
   specificationId: string,
   rawName: string,
+  cache?: SpecWriteCache,
 ): Promise<{ id: string; name: string }> {
   const name = normalizeReusableLabel(rawName);
   if (!name) throw new Error("INVALID_SPEC_VALUE");
   const key = reusableIdentityKey(name);
   const slug = reusableSlugOrFallback(name, "val");
 
-  const existing = await tx.specificationValue.findMany({
-    where: { specificationId },
-    include: { translations: true },
-  });
-  const match = existing.find(
-    (row) => row.slug === slug || matchesLabel(row.translations, key),
-  );
-  if (match) {
-    return { id: match.id, name: pickTranslation(match.translations).name || name };
+  await ensureValuesCached(tx, specificationId, cache);
+  const cached =
+    cache?.byKey.get(`val:${specificationId}:${key}`) ??
+    cache?.byKey.get(`valslug:${specificationId}:${slug}`);
+  if (cached) return cached;
+
+  if (!cache) {
+    const existing = await tx.specificationValue.findMany({
+      where: { specificationId },
+      include: { translations: true },
+    });
+    const match = existing.find((row) => row.slug === slug || matchesLabel(row.translations, key));
+    if (match) return { id: match.id, name: pickTranslation(match.translations).name || name };
+    const created = await tx.specificationValue.create({
+      data: {
+        specificationId,
+        slug,
+        sortOrder: existing.length,
+        translations: { create: { locale: "ka", name } },
+      },
+      include: { translations: true },
+    });
+    return { id: created.id, name };
   }
 
   const created = await tx.specificationValue.create({
     data: {
       specificationId,
       slug,
-      sortOrder: existing.length,
+      sortOrder: [...cache.byKey.keys()].filter((entry) => entry.startsWith(`valslug:${specificationId}:`)).length,
       translations: { create: { locale: "ka", name } },
     },
     include: { translations: true },
   });
-  return { id: created.id, name };
+  const resolved = { id: created.id, name };
+  cache.byKey.set(`val:${specificationId}:${key}`, resolved);
+  cache.byKey.set(`valslug:${specificationId}:${slug}`, resolved);
+  return resolved;
 }
 
 export async function renameSpecificationDefinition(id: string, rawName: string) {

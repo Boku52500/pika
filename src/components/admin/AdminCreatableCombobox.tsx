@@ -11,6 +11,7 @@ export type CreatableOption = { id: string; label: string };
 export function AdminCreatableCombobox({
   id,
   valueId,
+  valueLabel = "",
   options,
   placeholder,
   disabled,
@@ -20,6 +21,8 @@ export function AdminCreatableCombobox({
 }: {
   id?: string;
   valueId: string;
+  /** Fallback label when the selected id is not (yet) in `options`. */
+  valueLabel?: string;
   options: CreatableOption[];
   placeholder: string;
   disabled?: boolean;
@@ -29,13 +32,15 @@ export function AdminCreatableCombobox({
 }) {
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
-  const selected = options.find((option) => option.id === valueId) ?? null;
+  const selected =
+    options.find((option) => option.id === valueId) ??
+    (valueId && valueLabel ? { id: valueId, label: valueLabel } : null);
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(selected?.label ?? valueLabel ?? "");
   const [pending, setPending] = useState(false);
   const [active, setActive] = useState(0);
   const [flipUp, setFlipUp] = useState(false);
-  const display = open ? query : (selected?.label ?? query);
+  const display = open ? query : (selected?.label ?? valueLabel ?? query);
 
   function openMenu(target?: HTMLElement | null) {
     const el = target ?? rootRef.current?.querySelector("input");
@@ -87,6 +92,24 @@ export function AdminCreatableCombobox({
     setOpen(false);
   }
 
+  async function commitTypedValue() {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      if (valueId) onSelect(null);
+      return;
+    }
+    if (selected && reusableIdentityKey(selected.label) === reusableIdentityKey(trimmed)) return;
+    const match = options.find((option) => reusableIdentityKey(option.label) === reusableIdentityKey(trimmed));
+    if (match) {
+      onSelect(match);
+      setQuery(match.label);
+      return;
+    }
+    if (canCreate || (!exact && trimmed)) {
+      await choose({ id: "__create__", label: trimmed });
+    }
+  }
+
   return (
     <div ref={rootRef} className={open ? `${ADMIN_COMBOBOX_OPEN_STACK_CLASS} scroll-mb-36` : "relative scroll-mb-36"}>
       <input
@@ -99,7 +122,7 @@ export function AdminCreatableCombobox({
         value={display}
         placeholder={placeholder}
         onFocus={(event) => {
-          setQuery(selected?.label ?? "");
+          setQuery(selected?.label ?? valueLabel ?? "");
           openMenu(event.currentTarget);
         }}
         onChange={(event) => {
@@ -107,6 +130,13 @@ export function AdminCreatableCombobox({
           openMenu(event.currentTarget);
           setActive(0);
           if (!event.target.value.trim()) onSelect(null);
+        }}
+        onBlur={() => {
+          window.setTimeout(() => {
+            if (rootRef.current?.contains(document.activeElement)) return;
+            setOpen(false);
+            void commitTypedValue();
+          }, 0);
         }}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown") {
@@ -147,6 +177,7 @@ export function AdminCreatableCombobox({
                     index === active ? "bg-brand-50 text-brand-800" : "text-text hover:bg-surface-2",
                   )}
                   onMouseEnter={() => setActive(index)}
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => void choose(option)}
                 >
                   {option.id === "__create__" ? (createLabel ? createLabel(option.label) : `+ დამატება „${option.label}“`) : option.label}

@@ -26,7 +26,9 @@ import { parseMoneyInput } from "@/server/money";
 import { categoryWouldCycle } from "@/server/admin/categories";
 import { productArchiveData, productRestoreData } from "@/server/admin/productArchive";
 import { createReusableVariantOption } from "@/server/admin/variantOptions";
+import { planProductSpecifications } from "@/lib/adminProductSpecs";
 import {
+  createSpecWriteCache,
   deleteUnusedSpecificationDefinition,
   deleteUnusedSpecificationValue,
   findOrCreateSpecificationDefinition,
@@ -172,7 +174,11 @@ export async function saveAdminProduct(input: unknown): Promise<ActionResult<{ i
       return { ok: false, message: "კატეგორია ვერ მოიძებნა", fieldErrors: { categoryId: "აირჩიეთ არსებული კატეგორია" } };
     }
 
-    const saved = await prisma.$transaction(async (tx) => {
+    const specPlan = planProductSpecifications(data.specifications);
+    if (!specPlan.ok) return { ok: false, message: specPlan.message };
+
+    const saved = await prisma.$transaction(
+      async (tx) => {
       const productData = {
         sku: data.sku,
         slug: data.slug,
@@ -304,20 +310,21 @@ export async function saveAdminProduct(input: unknown): Promise<ActionResult<{ i
       }
 
       const resolvedSpecIds: string[] = [];
-      for (const spec of data.specifications) {
-        const value = spec.value.trim();
-        const named = spec.specificationName?.trim() ?? "";
-        let specificationId = spec.specificationId?.trim() ?? "";
-        if (!specificationId && named) {
-          specificationId = (await findOrCreateSpecificationDefinition(tx, named)).id;
+      const specCache = createSpecWriteCache();
+      for (const spec of specPlan.rows) {
+        let specificationId = spec.specificationId;
+        if (!specificationId) {
+          specificationId = (await findOrCreateSpecificationDefinition(tx, spec.specificationName, specCache)).id;
+        } else {
+          const definition = await tx.specificationDefinition.findUnique({
+            where: { id: specificationId },
+            select: { id: true },
+          });
+          if (!definition) {
+            throw new Error("INVALID_SPEC_DEFINITION");
+          }
         }
-        if (!specificationId || !value) continue;
-        const definition = await tx.specificationDefinition.findUnique({
-          where: { id: specificationId },
-          select: { id: true },
-        });
-        if (!definition) continue;
-        const library = await findOrCreateSpecificationValue(tx, specificationId, value);
+        const library = await findOrCreateSpecificationValue(tx, specificationId, spec.value, specCache);
         resolvedSpecIds.push(specificationId);
         await tx.productSpecification.upsert({
           where: {
@@ -342,7 +349,7 @@ export async function saveAdminProduct(input: unknown): Promise<ActionResult<{ i
         await tx.productSpecification.deleteMany({
           where: { productId: product.id, specificationId: { notIn: resolvedSpecIds } },
         });
-      } else {
+      } else if (specPlan.clearAll) {
         await tx.productSpecification.deleteMany({ where: { productId: product.id } });
       }
 
@@ -350,7 +357,9 @@ export async function saveAdminProduct(input: unknown): Promise<ActionResult<{ i
         id: product.id,
         staleObjectKeys: staleImages.map((row) => row.objectKey).filter((key): key is string => Boolean(key)),
       };
-    });
+    },
+      { maxWait: 15_000, timeout: 60_000 },
+    );
 
     for (const objectKey of saved.staleObjectKeys) {
       try {
@@ -365,6 +374,9 @@ export async function saveAdminProduct(input: unknown): Promise<ActionResult<{ i
   } catch (error) {
     if (error instanceof Error && error.message === "INVALID_VARIANT_OPTION") {
       return { ok: false, message: "არჩეული ვარიანტის მნიშვნელობა არასწორია" };
+    }
+    if (error instanceof Error && error.message === "INVALID_SPEC_DEFINITION") {
+      return { ok: false, message: "არჩეული სპეციფიკაცია აღარ არსებობს. აირჩიეთ თავიდან." };
     }
     if (error instanceof Error && (error.message === "INVALID_SPEC_NAME" || error.message === "INVALID_SPEC_VALUE")) {
       return { ok: false, message: "სპეციფიკაციის დასახელება ან მნიშვნელობა არასწორია" };

@@ -17,6 +17,7 @@ import {
   adminTextareaClass,
 } from "@/components/admin/adminUi";
 import { BADGE_KIND_OPTIONS } from "@/lib/adminLabels";
+import { planProductSpecifications } from "@/lib/adminProductSpecs";
 import { deactivateAdminProduct, restoreAdminProduct, saveAdminProduct, createAdminVariantOption, createAdminSpecification, createAdminSpecificationValue } from "@/server/actions/admin";
 import { AdminCreatableCombobox } from "@/components/admin/AdminCreatableCombobox";
 import { AdminProductDeleteButton } from "@/components/admin/AdminProductDeleteButton";
@@ -128,6 +129,18 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
     setMessage(null);
     setSuccess(null);
     setFieldErrors({});
+    const specPlan = planProductSpecifications(
+      specRows.map((row) => ({
+        specificationId: row.specificationId || undefined,
+        specificationName: row.specificationName,
+        valueId: row.valueId,
+        value: row.value,
+      })),
+    );
+    if (!specPlan.ok) {
+      setMessage(specPlan.message);
+      return;
+    }
     startTransition(async () => {
       const result = await saveAdminProduct({
         id: form.id || undefined,
@@ -167,10 +180,9 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
           isActive: variant.isActive,
           optionIds: variant.optionIds,
         })),
-        specifications: specRows.map((row) => ({
+        specifications: specPlan.rows.map((row) => ({
           specificationId: row.specificationId || undefined,
           specificationName: row.specificationName,
-          valueId: row.valueId,
           value: row.value,
         })),
       });
@@ -185,6 +197,10 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
         router.refresh();
         return;
       }
+      // Keep editor rows aligned with what we just persisted (drop blank drafts).
+      setSpecRows((current) =>
+        current.filter((row) => row.specificationId.trim() && row.value.trim()),
+      );
       router.refresh();
     });
   }
@@ -544,17 +560,19 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
                     <AdminCreatableCombobox
                       id={`spec-name-${index}`}
                       valueId={row.specificationId}
-                      options={definitions.map((item) => ({ id: item.id, label: item.unit ? `${item.name} (${item.unit})` : item.name }))}
+                      valueLabel={row.specificationName}
+                      options={definitions.map((item) => ({ id: item.id, label: item.name }))}
                       placeholder="ძებნა ან ახალი სპეციფიკაცია..."
                       createLabel={(label) => `+ დამატება „${label}“`}
                       onSelect={(option) => {
+                        const definition = option ? definitions.find((item) => item.id === option.id) : null;
                         setSpecRows((current) =>
                           current.map((item, i) =>
                             i === index
                               ? {
                                   ...item,
                                   specificationId: option?.id ?? "",
-                                  specificationName: option?.label ?? "",
+                                  specificationName: definition?.name ?? option?.label ?? "",
                                   valueId: "",
                                   value: "",
                                 }
@@ -581,6 +599,7 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
                     <AdminCreatableCombobox
                       id={`spec-value-${index}`}
                       valueId={row.valueId}
+                      valueLabel={row.value}
                       options={valueOptions.map((item) => ({ id: item.id, label: item.name }))}
                       placeholder="ძებნა ან ახალი მნიშვნელობა..."
                       disabled={!row.specificationId}
@@ -602,7 +621,12 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
                         setDefinitions((current) =>
                           current.map((item) =>
                             item.id === row.specificationId
-                              ? { ...item, values: [...item.values, { id: result.data.id, name: result.data.name }] }
+                              ? {
+                                  ...item,
+                                  values: item.values.some((value) => value.id === result.data.id)
+                                    ? item.values
+                                    : [...item.values, { id: result.data.id, name: result.data.name }],
+                                }
                               : item,
                           ),
                         );
