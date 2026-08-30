@@ -47,6 +47,7 @@ export const adminProductImageSchema = z.object({
   url: z.string().trim().min(1, "შეიყვანეთ სურათის URL").max(2000, "URL ძალიან გრძელია"),
   alt: z.string().trim().max(255).optional().default(""),
   sortOrder: z.number().int().min(0).max(999),
+  objectKey: z.string().trim().max(500).optional().nullable(),
 });
 
 export const adminProductImageAltSchema = z.object({

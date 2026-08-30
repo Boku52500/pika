@@ -154,3 +154,15 @@ describe("homepage trust badges", () => {
     assert.doesNotMatch(read("app/page.tsx"), /ოფიციალური პროდუქცია/);
   });
 });
+
+describe("admin product image upload before save", () => {
+  it("allows uploads without a saved product id", () => {
+    const manager = read("components/admin/ProductImageManager.tsx");
+    assert.doesNotMatch(manager, /ჯერ შეინახეთ პროდუქტი/);
+    assert.doesNotMatch(manager, /disabled=\{!productId/);
+    assert.match(manager, /discardAdminPendingProductImage/);
+    assert.match(read("server/actions/admin.ts"), /createPendingProductImageObjectKey/);
+    assert.match(read("server/storage/keys.ts"), /products\/pending/);
+    assert.match(read("components/admin/ProductEditor.tsx"), /objectKey: image\.objectKey/);
+  });
+});

@@ -45,9 +45,12 @@ import {
   createBrandLogoObjectKey,
   createCategoryImageObjectKey,
   createHeroImageObjectKey,
+  createPendingProductImageObjectKey,
   createProductImageObjectKey,
   deleteProductImageObject,
   getR2Config,
+  isManagedProductImageKey,
+  isPendingProductImageKey,
   processProductImage,
   ProductImageValidationError,
   publicUrlForObjectKey,
@@ -236,10 +239,13 @@ export async function saveAdminProduct(input: unknown): Promise<ActionResult<{ i
             update: { alt },
           });
         } else {
+          const objectKey =
+            image.objectKey && isManagedProductImageKey(image.objectKey) ? image.objectKey : null;
           const created = await tx.productImage.create({
             data: {
               productId: product.id,
               url: image.url.trim(),
+              objectKey,
               sortOrder,
               translations: { create: { locale: "ka", alt } },
             },
@@ -957,22 +963,24 @@ export async function uploadAdminProductImage(formData: FormData): Promise<Actio
   const productId = String(formData.get("productId") ?? "").trim();
   const altRaw = String(formData.get("alt") ?? "").trim();
   const file = formData.get("file");
-  if (!productId || !isUploadFile(file)) {
+  if (!isUploadFile(file)) {
     return { ok: false, message: "ატვირთეთ სურათის ფაილი" };
   }
   if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
     return { ok: false, message: "სურათი ძალიან დიდია (მაქსიმუმ 10 MB)" };
   }
 
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
-    select: {
-      id: true,
-      slug: true,
-      translations: { where: { locale: "ka" }, select: { name: true } },
-    },
-  });
-  if (!product) return { ok: false, message: "პროდუქტი ვერ მოიძებნა" };
+  const product = productId
+    ? await prisma.product.findUnique({
+        where: { id: productId },
+        select: {
+          id: true,
+          slug: true,
+          translations: { where: { locale: "ka" }, select: { name: true } },
+        },
+      })
+    : null;
+  if (productId && !product) return { ok: false, message: "პროდუქტი ვერ მოიძებნა" };
 
   const bytes = Buffer.from(await file.arrayBuffer());
   let processed: Buffer;
@@ -986,7 +994,9 @@ export async function uploadAdminProductImage(formData: FormData): Promise<Actio
 
   let objectKey: string;
   try {
-    objectKey = createProductImageObjectKey(product.id);
+    objectKey = product
+      ? createProductImageObjectKey(product.id)
+      : createPendingProductImageObjectKey();
   } catch {
     return { ok: false, message: "პროდუქტის იდენტიფიკატორი არასწორია" };
   }
@@ -999,7 +1009,15 @@ export async function uploadAdminProductImage(formData: FormData): Promise<Actio
   }
 
   const url = publicUrlForObjectKey(config.publicBaseUrl, objectKey);
-  const alt = altRaw || product.translations[0]?.name || "";
+  const alt = altRaw || product?.translations[0]?.name || "";
+
+  // New product form: keep the file in R2 only; ProductImage rows are created on save.
+  if (!product) {
+    return {
+      ok: true,
+      data: { id: "", url, alt, sortOrder: 0, objectKey },
+    };
+  }
 
   try {
     const created = await prisma.$transaction(async (tx) => {
@@ -1032,6 +1050,35 @@ export async function uploadAdminProductImage(formData: FormData): Promise<Actio
     }
     return { ok: false, message: GENERIC_SERVER_ERROR };
   }
+}
+
+export async function discardAdminPendingProductImage(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+
+  const objectKey =
+    input && typeof input === "object" && "objectKey" in input
+      ? String((input as { objectKey?: unknown }).objectKey ?? "").trim()
+      : "";
+  if (!objectKey || !isPendingProductImageKey(objectKey)) {
+    return { ok: false, message: "სურათი ვერ მოიძებნა" };
+  }
+
+  const linked = await prisma.productImage.findFirst({
+    where: { objectKey },
+    select: { id: true },
+  });
+  if (linked) {
+    return { ok: false, message: "სურათი უკვე მიბმულია პროდუქტზე" };
+  }
+
+  try {
+    await deleteProductImageObject(objectKey);
+  } catch (error) {
+    logError("admin.r2_pending_delete_failed", { error });
+    return { ok: false, message: "სურათის წაშლა საცავიდან ვერ მოხერხდა" };
+  }
+  return { ok: true };
 }
 
 export async function deleteAdminProductImage(input: unknown): Promise<ActionResult> {

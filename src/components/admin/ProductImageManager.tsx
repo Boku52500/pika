@@ -16,6 +16,7 @@ import {
 } from "@/lib/productImageLimits";
 import {
   deleteAdminProductImage,
+  discardAdminPendingProductImage,
   reorderAdminProductImages,
   updateAdminProductImageAlt,
   uploadAdminProductImage,
@@ -90,10 +91,6 @@ export function ProductImageManager({
 
   async function uploadFiles(fileList: FileList | File[]) {
     setMessage(null);
-    if (!productId) {
-      setMessage("ჯერ შეინახეთ პროდუქტი, შემდეგ ატვირთეთ სურათები.");
-      return;
-    }
     if (!storageConfigured) {
       setMessage("სურათების ატვირთვა არ არის კონფიგურირებული. დაამატეთ Cloudflare R2 ცვლადები .env-ში.");
       return;
@@ -122,7 +119,7 @@ export function ProductImageManager({
 
       setJobs((current) => [...current, { key: jobKey, name: file.name, status: "uploading" }]);
       const formData = new FormData();
-      formData.set("productId", productId);
+      if (productId) formData.set("productId", productId);
       formData.set("file", file);
       formData.set("alt", productName);
       const result = await uploadAdminProductImage(formData);
@@ -133,7 +130,18 @@ export function ProductImageManager({
         continue;
       }
       setJobs((current) => current.filter((job) => job.key !== jobKey));
-      nextImages = [...nextImages, { ...result.data, key: result.data.id }];
+      const uploaded = result.data;
+      nextImages = [
+        ...nextImages,
+        {
+          id: uploaded.id,
+          url: uploaded.url,
+          alt: uploaded.alt,
+          sortOrder: nextImages.length,
+          objectKey: uploaded.objectKey,
+          key: uploaded.id || uploaded.objectKey || jobKey,
+        },
+      ];
       onChange(nextImages);
     }
   }
@@ -145,6 +153,12 @@ export function ProductImageManager({
     setRemoveIndex(null);
     if (!target?.id) {
       onChange(remaining);
+      if (target?.objectKey) {
+        startTransition(async () => {
+          const result = await discardAdminPendingProductImage({ objectKey: target.objectKey });
+          if (!result.ok) setMessage(result.message);
+        });
+      }
       return;
     }
     startTransition(async () => {
@@ -176,10 +190,6 @@ export function ProductImageManager({
         </p>
       ) : null}
 
-      {!productId ? (
-        <p className="text-small mb-4 text-text-muted">ახალი პროდუქტისთვის ჯერ შეინახეთ ჩანაწერი, შემდეგ ატვირთეთ სურათები.</p>
-      ) : null}
-
       {!storageConfigured ? (
         <p role="status" className="text-small mb-4 rounded-[var(--radius-sm)] border border-warning-500/30 bg-warning-50 px-3 py-2 text-text">
           Cloudflare R2 ჯერ არ არის კონფიგურირებული, ამიტომ ატვირთვა გათიშულია. არსებული URL-ები რჩება. იხილეთ docs/storage.md.
@@ -204,7 +214,7 @@ export function ProductImageManager({
         className={cn(
           "mb-4 rounded-[var(--radius-sm)] border-2 border-dashed px-4 py-6 text-center",
           dragOver ? "border-brand-500 bg-brand-50" : "border-border",
-          (!productId || !storageConfigured) && "opacity-60",
+          !storageConfigured && "opacity-60",
         )}
       >
         <input
@@ -214,7 +224,7 @@ export function ProductImageManager({
           accept={PRODUCT_IMAGE_ACCEPT}
           multiple
           className="sr-only"
-          disabled={!productId || !storageConfigured || busy}
+          disabled={!storageConfigured || busy}
           onChange={(event) => {
             if (event.target.files?.length) void uploadFiles(event.target.files);
             event.target.value = "";

@@ -157,6 +157,7 @@ export function ProductEditor({ product, brands, categories, variantAttributes, 
             url: image.url,
             alt: image.alt,
             sortOrder: index,
+            objectKey: image.objectKey || null,
           })),
         variants: variants.map((variant) => ({
           id: variant.id || undefined,
