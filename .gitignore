@@ -20,6 +20,9 @@
 # production
 /build
 
+# import previews (local only)
+/tmp/
+
 # misc
 .DS_Store
 *.pem
