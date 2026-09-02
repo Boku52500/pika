@@ -1,4 +1,5 @@
 import { reusableIdentityKey, reusableSlug, reusableSlugOrFallback } from "@/lib/reusableLabel";
+import { categorySlugFromName } from "@/lib/categorySlug";
 
 /** Base storefront slug from product name. */
 export function baseProductSlug(name: string): string {
@@ -46,6 +47,9 @@ export function catalogIdentityKey(label: string): string {
 }
 
 export function catalogSlug(label: string, prefix: "brand" | "category"): string {
+  if (prefix === "category") {
+    return categorySlugFromName(label);
+  }
   const slug = reusableSlug(label);
   return slug || reusableSlugOrFallback(label, prefix);
 }

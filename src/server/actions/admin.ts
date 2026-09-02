@@ -28,6 +28,12 @@ import { productArchiveData, productRestoreData } from "@/server/admin/productAr
 import { createReusableVariantOption } from "@/server/admin/variantOptions";
 import { planProductSpecifications } from "@/lib/adminProductSpecs";
 import {
+  categorySlugFromName,
+  containsGeorgianCharacters,
+  ensureUniqueCategorySlug,
+  isCanonicalCategorySlug,
+} from "@/lib/categorySlug";
+import {
   createSpecWriteCache,
   deleteUnusedSpecificationDefinition,
   deleteUnusedSpecificationValue,
@@ -624,6 +630,26 @@ export async function saveAdminCategory(input: unknown): Promise<ActionResult<{ 
     if (!parent) return { ok: false, message: "მშობელი კატეგორია ვერ მოიძებნა", fieldErrors: { parentId: "აირჩიეთ არსებული კატეგორია" } };
   }
 
+  let slug = data.slug.trim();
+  if (!data.id) {
+    // Create: auto-generate Latin slug from Georgian name when admin left slug blank.
+    if (!slug) slug = categorySlugFromName(data.translations.ka.name);
+    const reserved = new Set(
+      (await prisma.category.findMany({ select: { slug: true } })).map((row) => row.slug),
+    );
+    slug = ensureUniqueCategorySlug(slug, reserved);
+  } else if (!slug) {
+    return { ok: false, message: "შეიყვანეთ slug", fieldErrors: { slug: "შეიყვანეთ slug" } };
+  }
+  // Updates keep the submitted slug (stable URLs on rename). Never accept Georgian characters.
+  if (containsGeorgianCharacters(slug) || !isCanonicalCategorySlug(slug)) {
+    return {
+      ok: false,
+      message: "Slug უნდა იყოს lowercase Latin kebab-case და არ შეიცავდეს ქართულ ასოებს",
+      fieldErrors: { slug: "მაგ: blenderi" },
+    };
+  }
+
   const writeTranslations = async (tx: Prisma.TransactionClient, categoryId: string) => {
     await tx.categoryTranslation.upsert({
       where: { categoryId_locale: { categoryId, locale: "ka" } },
@@ -672,7 +698,7 @@ export async function saveAdminCategory(input: unknown): Promise<ActionResult<{ 
   try {
     const id = await prisma.$transaction(async (tx) => {
       const payload = {
-        slug: data.slug,
+        slug,
         parentId,
         imageUrl: emptyToNull(data.imageUrl),
         iconKey: emptyToNull(data.iconKey),
@@ -690,7 +716,7 @@ export async function saveAdminCategory(input: unknown): Promise<ActionResult<{ 
       await writeTranslations(tx, category.id);
       return category.id;
     });
-    revalidateCatalogue({ categorySlug: data.slug });
+    revalidateCatalogue({ categorySlug: slug });
     return { ok: true, data: { id } };
   } catch (error) {
     const unique = uniqueMessage(error);

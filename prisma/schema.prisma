@@ -218,12 +218,27 @@ model Category {
   translations   CategoryTranslation[]
   products       Product[]
   specifications CategorySpecification[]
+  slugRedirects  CategorySlugRedirect[]
 
   @@index([parentId])
   @@index([isActive, sortOrder])
   @@index([slug, isActive])
   @@index([showInMainNav, navSortOrder])
   @@index([showOnHomepage, homepageSortOrder])
+}
+
+/** Maps retired Category.slug values to the current canonical Latin slug (308 redirects). */
+model CategorySlugRedirect {
+  id         String   @id @default(cuid())
+  oldSlug    String   @unique
+  newSlug    String
+  categoryId String?
+  createdAt  DateTime @default(now())
+
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([newSlug])
+  @@index([categoryId])
 }
 
 model CategoryTranslation {

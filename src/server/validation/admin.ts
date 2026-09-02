@@ -120,7 +120,16 @@ export const adminProductSaveSchema = z
 
 export const adminCategorySaveSchema = z.object({
   id: z.string().trim().min(1).optional(),
-  slug,
+  /** Empty slug is allowed on create — server generates a Latin slug from the Georgian name. */
+  slug: z
+    .string()
+    .trim()
+    .max(160, "Slug ძალიან გრძელია")
+    .refine(
+      (value) => value === "" || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value),
+      "Slug უნდა იყოს lowercase Latin kebab-case, მაგ: blenderi",
+    )
+    .refine((value) => !/[\u10A0-\u10FF]/.test(value), "Slug არ შეიძლება შეიცავდეს ქართულ ასოებს"),
   parentId: z.string().trim().min(1).nullable().optional(),
   imageUrl: z.string().trim().max(2000).optional().default(""),
   iconKey: z.string().trim().max(80).optional().default(""),

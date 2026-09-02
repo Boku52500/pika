@@ -7,6 +7,7 @@ import { FormField } from "@/components/ui/FormField";
 import { adminCardClass, adminInputErrorClass, adminSelectClass, adminTextareaClass } from "@/components/admin/adminUi";
 import { saveAdminCategory, uploadAdminCategoryImage } from "@/server/actions/admin";
 import type { AdminCategoryEditorData, AdminCategoryRow } from "@/server/admin/categories";
+import { categorySlugFromName } from "@/lib/categorySlug";
 
 export function CategoryEditor({
   category,
@@ -22,6 +23,7 @@ export function CategoryEditor({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState(category);
+  const [slugTouched, setSlugTouched] = useState(Boolean(category.slug));
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -40,6 +42,20 @@ export function CategoryEditor({
     walk(form.id);
   }
   const parentOptions = allCategories.filter((row) => row.id !== form.id && !descendantIds.has(row.id));
+
+  function onGeorgianNameChange(name: string) {
+    setForm((c) => {
+      const next = {
+        ...c,
+        translations: { ...c.translations, ka: { ...c.translations.ka, name } },
+      };
+      // Only auto-fill slug on create while the admin has not edited slug manually.
+      if (isNew && !slugTouched) {
+        next.slug = name.trim() ? categorySlugFromName(name) : "";
+      }
+      return next;
+    });
+  }
 
   function submit() {
     setMessage(null);
@@ -85,12 +101,26 @@ export function CategoryEditor({
             <input
               id="cat-name"
               value={form.translations.ka.name}
-              onChange={(e) => setForm((c) => ({ ...c, translations: { ...c.translations, ka: { ...c.translations.ka, name: e.target.value } } }))}
+              onChange={(e) => onGeorgianNameChange(e.target.value)}
               className={adminInputErrorClass(Boolean(fieldErrors["translations.ka.name"]))}
             />
           </FormField>
-          <FormField id="cat-slug" label="Slug" required error={fieldErrors.slug}>
-            <input id="cat-slug" value={form.slug} onChange={(e) => setForm((c) => ({ ...c, slug: e.target.value }))} className={adminInputErrorClass(Boolean(fieldErrors.slug))} />
+          <FormField
+            id="cat-slug"
+            label={isNew ? "Slug (ავტომატური Latin)" : "Slug"}
+            required={!isNew}
+            error={fieldErrors.slug}
+          >
+            <input
+              id="cat-slug"
+              value={form.slug}
+              onChange={(e) => {
+                setSlugTouched(true);
+                setForm((c) => ({ ...c, slug: e.target.value }));
+              }}
+              placeholder={isNew ? "მაგ: blenderi" : undefined}
+              className={adminInputErrorClass(Boolean(fieldErrors.slug))}
+            />
           </FormField>
           <FormField id="cat-parent" label="მშობელი კატეგორია" optional error={fieldErrors.parentId}>
             <select id="cat-parent" value={form.parentId} onChange={(e) => setForm((c) => ({ ...c, parentId: e.target.value }))} className={adminSelectClass}>
