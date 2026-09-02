@@ -260,9 +260,9 @@ export async function executeProductImport(products: PlannedProduct[]): Promise<
 }
 
 /**
- * Update ONLY AI/generated content fields + approved slug for an existing Excel-import SKU.
- * Does not invent images/specs/variants. Does not change brand/category IDs.
- * Optionally syncs Excel-authoritative name + price.
+ * Update import-owned fields for an existing Excel-import SKU.
+ * Syncs Excel name/price/brand/category + approved AI content/slug.
+ * Does not invent images/specs/variants. Does not touch orders/payments/customers.
  */
 export async function updateExistingProductAiContent(input: {
   sku: string;
@@ -274,14 +274,21 @@ export async function updateExistingProductAiContent(input: {
   fullDescription: string;
   seoTitle: string;
   seoDescription: string;
+  brand?: string;
+  category?: string;
   syncExcelNameAndPrice?: boolean;
-}): Promise<{ ok: true; id: string; slugChanged: boolean } | { ok: false; issue: RowIssue }> {
+}): Promise<
+  | { ok: true; id: string; slugChanged: boolean; brandCategoryChanged: boolean }
+  | { ok: false; issue: RowIssue }
+> {
   try {
     const existing = await prisma.product.findUnique({
       where: { sku: input.sku },
       select: {
         id: true,
         slug: true,
+        brandId: true,
+        categoryId: true,
         translations: { where: { locale: "ka" }, select: { id: true }, take: 1 },
       },
     });
@@ -325,11 +332,28 @@ export async function updateExistingProductAiContent(input: {
     }
 
     const price = parseMoneyInput(input.price);
+    const cache: LabelCache = new Map();
+    const createdBrands = new Set<string>();
+    const createdCategories = new Set<string>();
+    let brandCategoryChanged = false;
+
     await prisma.$transaction(async (tx) => {
+      let brandId = existing.brandId;
+      let categoryId = existing.categoryId;
+      if (input.brand) {
+        brandId = await findOrCreateBrand(tx, input.brand, cache, createdBrands);
+      }
+      if (input.category) {
+        categoryId = await findOrCreateCategory(tx, input.category, cache, createdCategories);
+      }
+      brandCategoryChanged = brandId !== existing.brandId || categoryId !== existing.categoryId;
+
       await tx.product.update({
         where: { id: existing.id },
         data: {
           slug: targetSlug,
+          brandId,
+          categoryId,
           ...(input.syncExcelNameAndPrice ? { price } : {}),
         },
       });
@@ -361,7 +385,12 @@ export async function updateExistingProductAiContent(input: {
       }
     });
 
-    return { ok: true, id: existing.id, slugChanged: targetSlug !== existing.slug };
+    return {
+      ok: true,
+      id: existing.id,
+      slugChanged: targetSlug !== existing.slug,
+      brandCategoryChanged,
+    };
   } catch (error) {
     return {
       ok: false,
