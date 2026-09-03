@@ -14,6 +14,7 @@ export type AdminCategoryRow = {
   showInMainNav: boolean;
   navSortOrder: number;
   productCount: number;
+  childCount: number;
   depth: number;
 };
 
@@ -72,6 +73,9 @@ export async function listAdminCategories(): Promise<AdminCategoryRow[]> {
     list.push(category);
     byParent.set(key, list);
   }
+  for (const list of byParent.values()) {
+    list.sort((a, b) => a.sortOrder - b.sortOrder || a.slug.localeCompare(b.slug));
+  }
 
   const rows: AdminCategoryRow[] = [];
   const walk = (parentId: string | null, depth: number) => {
@@ -87,6 +91,7 @@ export async function listAdminCategories(): Promise<AdminCategoryRow[]> {
         showInMainNav: category.showInMainNav,
         navSortOrder: category.navSortOrder,
         productCount: category._count.products,
+        childCount: byParent.get(category.id)?.length ?? 0,
         depth,
       });
       walk(category.id, depth + 1);
@@ -108,6 +113,7 @@ export async function listAdminCategories(): Promise<AdminCategoryRow[]> {
       showInMainNav: category.showInMainNav,
       navSortOrder: category.navSortOrder,
       productCount: category._count.products,
+      childCount: byParent.get(category.id)?.length ?? 0,
       depth: 0,
     });
   }

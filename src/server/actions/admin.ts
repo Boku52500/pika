@@ -9,6 +9,7 @@ import { GENERIC_SERVER_ERROR, type ActionResult } from "@/server/actions/result
 import {
   adminBrandSaveSchema,
   adminCategorySaveSchema,
+  adminCategoryTreeMoveSchema,
   adminHeroReorderSchema,
   adminHeroSlideSaveSchema,
   adminIdSchema,
@@ -33,6 +34,7 @@ import {
   ensureUniqueCategorySlug,
   isCanonicalCategorySlug,
 } from "@/lib/categorySlug";
+import { canDeleteCategory, planCategoryTreeMove } from "@/lib/categoryTree";
 import {
   createSpecWriteCache,
   deleteUnusedSpecificationDefinition,
@@ -697,12 +699,22 @@ export async function saveAdminCategory(input: unknown): Promise<ActionResult<{ 
 
   try {
     const id = await prisma.$transaction(async (tx) => {
+      let sortOrder = data.sortOrder;
+      if (!data.id) {
+        // New categories default to ROOT; append after existing siblings under the chosen parent.
+        const parentKey = parentId;
+        const max = await tx.category.aggregate({
+          where: { parentId: parentKey },
+          _max: { sortOrder: true },
+        });
+        sortOrder = (max._max.sortOrder ?? -1) + 1;
+      }
       const payload = {
         slug,
         parentId,
         imageUrl: emptyToNull(data.imageUrl),
         iconKey: emptyToNull(data.iconKey),
-        sortOrder: data.sortOrder,
+        sortOrder,
         isActive: data.isActive,
         indexable: data.indexable,
         showInMainNav: data.showInMainNav,
@@ -722,6 +734,96 @@ export async function saveAdminCategory(input: unknown): Promise<ActionResult<{ 
     const unique = uniqueMessage(error);
     if (unique) return { ok: false, message: unique };
     logError("admin.save_category_failed", { error });
+    return { ok: false, message: GENERIC_SERVER_ERROR };
+  }
+}
+
+/**
+ * Persist a drag/drop hierarchy change.
+ * Updates ONLY parentId + sortOrder. Never changes slug or product assignments.
+ */
+export async function moveAdminCategoryTree(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminCategoryTreeMoveSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "კატეგორიის გადაადგილება ვერ მოხერხდა" };
+  }
+
+  const all = await prisma.category.findMany({
+    select: { id: true, parentId: true, sortOrder: true, slug: true },
+  });
+  const plan = planCategoryTreeMove({
+    nodes: all,
+    categoryId: parsed.data.categoryId,
+    newParentId: parsed.data.newParentId,
+    indexAmongSiblings: parsed.data.indexAmongSiblings,
+  });
+  if (!plan.ok) {
+    if (plan.code === "UNCHANGED") return { ok: true };
+    return { ok: false, message: plan.message };
+  }
+
+  // Defense in depth: never write a slug field from this path.
+  try {
+    await prisma.$transaction(
+      plan.updates.map((update) =>
+        prisma.category.update({
+          where: { id: update.id },
+          data: { parentId: update.parentId, sortOrder: update.sortOrder },
+        }),
+      ),
+    );
+    const moved = all.find((row) => row.id === parsed.data.categoryId);
+    revalidateCatalogue({ categorySlug: moved?.slug });
+    return { ok: true };
+  } catch (error) {
+    logError("admin.move_category_tree_failed", { error });
+    return { ok: false, message: GENERIC_SERVER_ERROR };
+  }
+}
+
+export async function deleteAdminCategory(input: unknown): Promise<ActionResult> {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+  const parsed = adminIdSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "კატეგორია ვერ მოიძებნა" };
+
+  const category = await prisma.category.findUnique({
+    where: { id: parsed.data.id },
+    select: {
+      id: true,
+      slug: true,
+      parentId: true,
+      _count: { select: { products: true, children: true } },
+    },
+  });
+  if (!category) return { ok: false, message: "კატეგორია ვერ მოიძებნა" };
+
+  const check = canDeleteCategory({
+    childCount: category._count.children,
+    productCount: category._count.products,
+  });
+  if (!check.ok) return { ok: false, message: check.message };
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.category.delete({ where: { id: category.id } });
+      const siblings = await tx.category.findMany({
+        where: { parentId: category.parentId },
+        select: { id: true },
+        orderBy: [{ sortOrder: "asc" }, { slug: "asc" }],
+      });
+      await Promise.all(
+        siblings.map((row, index) =>
+          tx.category.update({ where: { id: row.id }, data: { sortOrder: index } }),
+        ),
+      );
+    });
+    revalidateCatalogue({ categorySlug: category.slug });
+    return { ok: true };
+  } catch (error) {
+    logError("admin.delete_category_failed", { error });
     return { ok: false, message: GENERIC_SERVER_ERROR };
   }
 }

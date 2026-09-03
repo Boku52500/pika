@@ -301,10 +301,18 @@ export const adminSpecificationRenameSchema = z.object({
     .max(80, "დასახელება ძალიან გრძელია"),
 });
 
+/** Drag/drop hierarchy move: parentId + sibling index under that parent. */
+export const adminCategoryTreeMoveSchema = z.object({
+  categoryId: z.string().trim().min(1),
+  newParentId: z.string().trim().min(1).nullable(),
+  indexAmongSiblings: z.number().int().min(0).max(10_000),
+});
+
 export type AdminProductSaveInput = z.infer<typeof adminProductSaveSchema>;
 export type AdminCategorySaveInput = z.infer<typeof adminCategorySaveSchema>;
 export type AdminBrandSaveInput = z.infer<typeof adminBrandSaveSchema>;
 export type AdminHeroSlideSaveInput = z.infer<typeof adminHeroSlideSaveSchema>;
 export type AdminPromotionSaveInput = z.infer<typeof adminPromotionSaveSchema>;
+export type AdminCategoryTreeMoveInput = z.infer<typeof adminCategoryTreeMoveSchema>;
 
 export { slug as adminSlugSchema, optionalSlug, moneyField, optionalMoneyField, optionalText };
